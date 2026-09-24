@@ -1,0 +1,14 @@
+{
+  "version": 4,
+  "global_owner": 1054352381,
+  "default_mute_minutes": 30,
+  "max_warns": 3,
+  "log_peer_id": 0,
+  "roles": {},
+  "chats": {},
+  "known_peers": [],
+  "tickets": {},
+  "next_ticket_id": 1,
+  "user_stats": {},
+  "custom_events": {}
+}
