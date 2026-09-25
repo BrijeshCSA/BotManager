@@ -21,7 +21,7 @@ if not TOKEN:
     print("   Добавь переменную VK_TOKEN = ваш_токен_группы")
     sys.exit(1)
 
-WELCOME_TEXT = """👋 Добро пожаловать, {user}!
+WELCOME_TEXT = """👋 Добро пожаловать, {user} полезные команды тут /help!
 
 📋 Команды:
 /help /staff /role /стата
