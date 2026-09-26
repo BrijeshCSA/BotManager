@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-VK-бот 8.0 — государства + экономика + армия + войны + коалиции + игры + Мафия
+VK-бот 9.0 — государства, войны, донат, выдача, сирена, заложники
 """
 
 import os, re, sys, json, time, random, threading, difflib
@@ -21,24 +21,21 @@ if not TOKEN: print("❌ VK_TOKEN не задан"); sys.exit(1)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 PID_FILE = "/tmp/.bot.pid"
-CFG_VERSION = 8
+CFG_VERSION = 9
 MUTE_DM_INTERVAL = 300
 START_BALANCE = 100
 PRIZE_MIN, PRIZE_MAX, PRIZE_COOLDOWN = 1000, 900000, 86400
 VIP_PRICE, VIP_DURATION, VIP_BONUS = 1000000, 30*86400, 0.10
 ADMIN_ABUSE_TITLE, ADMIN_ABUSE_MSGS = "👑 Admin Abuser", 50
 
-# ================================================================
-# ВОЙНА
-# ================================================================
-WAR_COST = 1000000           # 1 млн на объявление войны
-WAR_CAPTURE_SECONDS = 300    # 5 минут кампании
-BASE_ARMY = 100000           # базовые войска страны
+WAR_COST = 1000000
+WAR_CAPTURE_SECONDS = 300
+BASE_ARMY = 100000
 ARMY_LEVEL_MAX = 10
-ARMY_LEVEL_MULT = 1.15       # каждая прокачка +15%
-MIL_TASK_COOLDOWN = 3600     # задание на пополнение раз в час
-MIL_TASK_REWARD = 5000       # войск за задание
-MIL_TASK_COST = 100000       # стоит задание
+ARMY_LEVEL_MULT = 1.15
+MIL_TASK_COOLDOWN = 3600
+MIL_TASK_REWARD = 5000
+MIL_TASK_COST = 100000
 
 # ================================================================
 # СТРАНЫ
@@ -70,7 +67,6 @@ COUNTRIES = {
     "оаэ": {"name":"🇦🇪 ОАЭ","bonus":8000},
 }
 
-# 20 городов (первые 3 открыты сразу, остальные за улучшение)
 CITIES = [
     "Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург",
     "Казань", "Нижний Новгород", "Челябинск", "Самара",
@@ -80,16 +76,16 @@ CITIES = [
 ]
 
 BUILDINGS = {
-    "больница":      {"cost": 200000, "bonus": "рост населения +5%",      "emoji":"🏥"},
-    "завод":         {"cost": 300000, "bonus": "доход казны +5%",         "emoji":"🏭"},
-    "школа":         {"cost": 150000, "bonus": "грамотность +5%",         "emoji":"🏫"},
-    "университет":   {"cost": 500000, "bonus": "наука +10%",              "emoji":"🎓"},
-    "электростанция":{"cost": 400000, "bonus": "энергия +10%",            "emoji":"⚡"},
-    "жилой комплекс":{"cost": 250000, "bonus": "население +10%",          "emoji":"🏢"},
-    "казарма":       {"cost": 350000, "bonus": "войск +5000",             "emoji":"🏛"},
-    "военный завод":{"cost": 600000, "bonus": "производство техники +10%", "emoji":"🏗"},
-    "верфь":         {"cost": 800000, "bonus": "кораблей +1 шт/час",      "emoji":"⛴"},
-    "аэропорт":      {"cost": 1000000,"bonus": "доход +15%",              "emoji":"✈️"},
+    "больница":      {"cost": 200000, "bonus": "рост +5%",       "emoji":"🏥"},
+    "завод":         {"cost": 300000, "bonus": "доход +5%",      "emoji":"🏭"},
+    "школа":         {"cost": 150000, "bonus": "грамотность +5%","emoji":"🏫"},
+    "университет":   {"cost": 500000, "bonus": "наука +10%",     "emoji":"🎓"},
+    "электростанция":{"cost": 400000, "bonus": "энергия +10%",   "emoji":"⚡"},
+    "жилой комплекс":{"cost": 250000, "bonus": "население +10%", "emoji":"🏢"},
+    "казарма":       {"cost": 350000, "bonus": "+5000 войск",    "emoji":"🏛"},
+    "военный завод":{"cost": 600000, "bonus": "техника +10%",   "emoji":"🏗"},
+    "верфь":         {"cost": 800000, "bonus": "+1 корабль/час", "emoji":"⛴"},
+    "аэропорт":      {"cost": 1000000,"bonus": "доход +15%",     "emoji":"✈️"},
 }
 
 WEAPONS = {
@@ -116,9 +112,6 @@ GOV_POSITIONS = [
     "сенатор", "губернатор", "дипломат"
 ]
 
-# ================================================================
-# БИЗНЕСЫ
-# ================================================================
 BUSINESSES = {
     "киоск":       {"price": 1000,  "income": 50,   "emoji": "🏪"},
     "кафе":        {"price": 5000,  "income": 250,  "emoji": "☕"},
@@ -145,17 +138,15 @@ PUBLIC_CMDS = [
     "гонка","race","рыбалка","fish",
     "приз","prize","подписка","sub",
     "promo","промо","cmd","offer","report","ивент","event",
-    # государства
     "страны","государства","гражданство","citizenship","паспорт","passport",
     "страна","country","граждане","города","казна","правительство","должности",
     "армия","выборы","выдвинуться","голос","компания","регистрация",
     "переименоватьооо",
-    # военные
     "войны","война","захват","контразащита","мир",
     "коалиции","коалиция","коалпомощь","военпомощь","помочьвойна",
     "мобилизация","демобилизация","сделать","установить","пво",
     "запуск","задание","выполнитьзадание","задания",
-    "госскоманды",
+    "госскоманды","донат","сирена","воздухтревога",
 ]
 
 HELPER_CMDS = PUBLIC_CMDS + ["warn","promolist","createpromo","вайп"]
@@ -163,16 +154,15 @@ MODERATOR_CMDS = HELPER_CMDS + ["nick","rnick","unwarn","mute","unmute",
                                  "clear","banlist","tickets","adt"]
 ADMIN_CMDS = MODERATOR_CMDS + ["kick","ban","unban","gban","ungban"]
 STAFF_CMDS = ADMIN_CMDS + ["loginfo","builds"]
-
 OWNER_CMDS = STAFF_CMDS + ["removestaff","setrole","setowner",
                             "setlog","unsetlog","setwarns","setmutetime",
                             "newrole","delrole","createivent","вайп_все",
-                            # государственные команды для владельца беседы
                             "налоги","назначить","снятьминистра","воинскоезвание",
                             "улучшитьстрану","постройки","построить","госпроект","вооружение"]
 
 GLOBAL_ONLY = ["объявление","announce","рассылка","setpresident","setcommander",
-               "grole","removerole","gstaff","устгражданство","устпрезидент"]
+               "grole","removerole","gstaff","устгражданство","устпрезидент",
+               "выдать"]
 
 DEFAULT_ROLES = {
     "head": {"name":"Руководитель","priority":95,"commands":STAFF_CMDS},
@@ -202,6 +192,7 @@ ALL_COMMANDS.update(GLOBAL_ONLY + [
     "builds","promolist","createpromo","вайп","вайп_все",
     "налоги","назначить","снятьминистра","воинскоезвание","улучшитьстрану",
     "постройки","построить","госпроект","вооружение","устгражданство","устпрезидент",
+    "донат","сирена","воздухтревога","выдать","build",
 ])
 
 # ================================================================
@@ -223,8 +214,9 @@ def default_country_data():
         "army": BASE_ARMY,
         "army_level": 1,
         "weapons": {w: 0 for w in WEAPONS},
+        "nukes": 0,
         "cities_unlocked": 3,
-        "cities": {c: {"buildings": []} for c in CITIES[:3]},
+        "cities": {c: {"buildings": [], "pvo": 0, "siren": False} for c in CITIES[:3]},
         "coalition": None,
         "wars": [],
         "tax": 5,
@@ -233,6 +225,10 @@ def default_country_data():
         "projects": [],
         "mil_task_cooldown": {},
         "history": [],
+        "destroyed": False,
+        "captured_by": None,
+        "destroyed_at": 0,
+        "hostages": [],
     }
 
 DEFAULT_CFG = {
@@ -264,11 +260,15 @@ def migrate(d):
     d["version"] = CFG_VERSION
     d.setdefault("countries", {})
     for k in COUNTRIES:
-        if k not in d["countries"]: d["countries"][k] = default_country_data()
+        if k not in d["countries"]:
+            d["countries"][k] = default_country_data()
         else:
             base = default_country_data()
             for kk, vv in base.items():
                 d["countries"][k].setdefault(kk, vv)
+            cd = d["countries"][k]
+            for c_name in CITIES:
+                cd["cities"].setdefault(c_name, {"buildings": [], "pvo": 0, "siren": False})
     d.setdefault("citizens", {})
     d.setdefault("coalitions", {})
     d.setdefault("wars", [])
@@ -416,9 +416,6 @@ def log_action(actor_id, text):
 def is_chat(peer_id): return peer_id > 2000000000
 def chat_id_from_peer(peer_id): return peer_id - 2000000000 if peer_id > 2000000000 else None
 
-# ================================================================
-# ПРОВЕРКА ПРАВ БОТА В БЕСЕДЕ
-# ================================================================
 _admin_cache = {}
 _admin_lock = threading.Lock()
 ADMIN_CHECK_TTL = 30
@@ -450,15 +447,13 @@ def is_bot_admin(peer_id, force=False):
                 is_admin = bool(m.get("is_admin") or m.get("is_owner"))
                 break
     except Exception as e:
-        print(f"[is_bot_admin] {e}")
-        is_admin = True
+        print(f"[is_bot_admin] {e}"); is_admin = True
     with _admin_lock:
         _admin_cache[peer_id] = (is_admin, now)
     return is_admin
 
 def cache_invalidate_admin(peer_id):
-    with _admin_lock:
-        _admin_cache.pop(peer_id, None)
+    with _admin_lock: _admin_cache.pop(peer_id, None)
 
 def get_chat(peer_id):
     if not is_chat(peer_id): return None
@@ -622,13 +617,13 @@ def set_citizenship(uid, country_key, rank="гражданин"):
         if oc and uid in oc.get("citizens", []): oc["citizens"].remove(uid)
         if oc and oc.get("president") == uid: oc["president"] = None
         if oc and oc.get("commander") == uid: oc["commander"] = None
-        # убрать из правительства
         if oc:
             for pos, u in list(oc.get("government", {}).items()):
                 if u == uid: del oc["government"][pos]
     c = cfg.setdefault("citizens", {})
     c[str(uid)] = {"country": country_key, "rank": rank,
-                    "joined_at": int(time.time()), "donated": 0}
+                    "joined_at": int(time.time()), "donated": 0,
+                    "hostage_until": 0}
     country = get_country(country_key)
     if country and uid not in country["citizens"]: country["citizens"].append(uid)
     save_cfg(cfg)
@@ -642,9 +637,8 @@ def full_vip_mult(peer_id, uid):
     return vip_multiplier(peer_id, uid) * country_income_mult(uid)
 
 def country_army_power(key):
-    """Военная мощь страны = армия × уровень × (1 + техника)."""
     c = get_country(key)
-    if not c: return 0
+    if not c or c.get("destroyed"): return 0
     base = c.get("army", 0) * (ARMY_LEVEL_MULT ** (c.get("army_level", 1) - 1))
     wp = sum(WEAPONS.get(w, {}).get("power", 0) * cnt for w, cnt in c.get("weapons", {}).items())
     return int(base + wp)
@@ -659,19 +653,211 @@ def country_add_history(key, text):
     c["history"] = c["history"][:20]
 
 def broadcast_country(key, text):
-    """Отправить всем гражданам страны в ЛС."""
     c = get_country(key)
     if not c: return
     for uid in c.get("citizens", []):
         send_dm(uid, f"🏛 [{country_name(key)}] {text}")
 
 # ================================================================
-# ГОСУДАРСТВЕННЫЕ КОМАНДЫ
+# ДОНАТ / СИРЕНА / ВЫДАТЬ
+# ================================================================
+def cmd_donate(peer_id, uid, args):
+    cit = get_citizenship(uid)
+    if not cit:
+        send(peer_id, "⚠ Только граждане могут донатить.\n/гражданство <страна>"); return
+    if not args or not args[0].isdigit():
+        send(peer_id, "⚠ /донат <сумма>\nПример: /донат 50000"); return
+    amount = int(args[0])
+    if amount <= 0: send(peer_id, "⚠ Сумма > 0"); return
+    bal = get_balance(peer_id, uid)
+    if bal < amount:
+        send(peer_id, f"❌ У вас {fmt_num(bal)} 💵, не хватает."); return
+    key = cit["country"]; c = get_country(key)
+    if c.get("destroyed"):
+        send(peer_id, "❌ Страна уничтожена — донат невозможен."); return
+    add_balance(peer_id, uid, -amount)
+    c["treasury"] = c.get("treasury", 0) + amount
+    cfg["citizens"][str(uid)]["donated"] = cfg["citizens"][str(uid)].get("donated", 0) + amount
+    country_add_history(key, f"{mention(uid)} пожертвовал {fmt_num(amount)} 💵")
+    save_cfg(cfg)
+    send(peer_id,
+         f"💵 Пожертвовано: {fmt_num(amount)} 💵 в казну {country_name(key)}!\n\n"
+         f"💰 Казна: {fmt_num(c.get('treasury', 0))}\n"
+         f"🎖️ Всего вложено: {fmt_num(cfg['citizens'][str(uid)]['donated'])}")
+    broadcast_country(key, f"💵 {mention(uid)} пожертвовал {fmt_num(amount)} 💵 в казну!")
+
+def cmd_siren(peer_id, uid, args):
+    cit = get_citizenship(uid)
+    if not cit: send(peer_id, "⚠ Только граждане."); return
+    key = cit["country"]; c = get_country(key)
+    if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
+        send(peer_id, "⛔ Только президент или главком."); return
+    if c.get("destroyed"): send(peer_id, "❌ Страна уничтожена."); return
+    if not args: send(peer_id, "⚠ /сирена <город>\nПример: /сирена Москва"); return
+    city = " ".join(args).title()
+    city_match = next((x for x in CITIES if x.lower() == city.lower()), None)
+    if not city_match: send(peer_id, "❌ Город не найден."); return
+    if CITIES.index(city_match) >= c.get("cities_unlocked", 3):
+        send(peer_id, "❌ Город не открыт."); return
+    c["cities"][city_match]["siren"] = True
+    country_add_history(key, f"воздушная тревога в {city_match}")
+    save_cfg(cfg)
+    broadcast_country(key,
+        f"🚨🚨🚨 ВОЗДУШНАЯ ТРЕВОГА 🚨🚨🚨\n\n"
+        f"🏙 Город: {city_match}\n"
+        f"🌍 Страна: {country_name(key)}\n\n"
+        f"⚠️ Немедленно проследуйте в укрытие!")
+    def clear_siren():
+        time.sleep(300)
+        cc = get_country(key)
+        if cc and city_match in cc.get("cities", {}):
+            cc["cities"][city_match]["siren"] = False; save_cfg(cfg)
+        broadcast_country(key, f"🟢 Отбой тревоги в {city_match}.")
+    threading.Thread(target=clear_siren, daemon=True).start()
+    send(peer_id, f"🚨 Тревога в {city_match} запущена!")
+
+def cmd_siren_all(peer_id, uid, args):
+    cit = get_citizenship(uid)
+    if not cit: send(peer_id, "⚠ Только граждане."); return
+    key = cit["country"]; c = get_country(key)
+    if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
+        send(peer_id, "⛔ Нет прав."); return
+    if c.get("destroyed"): send(peer_id, "❌ Страна уничтожена."); return
+    for city in list(c.get("cities", {}).keys()):
+        c["cities"][city]["siren"] = True
+    country_add_history(key, "всеобщая воздушная тревога")
+    save_cfg(cfg)
+    broadcast_country(key,
+        f"🚨🚨🚨 ВСЕОБЩАЯ ВОЗДУШНАЯ ТРЕВОГА 🚨🚨🚨\n\n"
+        f"🌍 {country_name(key)}\n⚠️ Всем в укрытие!")
+    def clear_all():
+        time.sleep(600)
+        cc = get_country(key)
+        if cc:
+            for city in cc.get("cities", {}): cc["cities"][city]["siren"] = False
+            save_cfg(cfg)
+        broadcast_country(key, "🟢 Отбой тревоги.")
+    threading.Thread(target=clear_all, daemon=True).start()
+    send(peer_id, "🚨 Всеобщая тревога!")
+
+def cmd_give(peer_id, uid, args, reply_msg, text):
+    if uid != int(cfg["global_owner"]):
+        send(peer_id, "⛔ Только Главный владелец."); return
+    if not args:
+        send(peer_id,
+             "📋 <b>Выдача ресурсов:</b>\n\n"
+             "💰 /выдать деньги @user <сумма>\n"
+             "💰 /выдать деньги казна <страна> <сумма>\n"
+             "🔫 /выдать оружие @user <тип> <кол>\n"
+             "🔫 /выдать оружие казна <страна> <тип> <кол>\n"
+             "🎖️ /выдать военных <страна> <кол>\n"
+             "👑 /выдать вип @user\n"
+             "☢️ /выдать ядерка <страна> <кол>")
+        return
+    kind = args[0].lower()
+    if kind == "деньги":
+        if len(args) >= 2 and args[1].lower() in ("казна","страна"):
+            if len(args) < 4 or not args[-1].isdigit():
+                send(peer_id, "⚠ /выдать деньги казна <страна> <сумма>"); return
+            key = args[2].lower()
+            if key not in COUNTRIES: send(peer_id, "⚠ Страна не найдена."); return
+            amount = int(args[-1])
+            c = get_country(key)
+            c["treasury"] = c.get("treasury", 0) + amount
+            country_add_history(key, f"Global выдал +{fmt_num(amount)}")
+            save_cfg(cfg)
+            send(peer_id, f"✅ В казну {country_name(key)}: +{fmt_num(amount)} 💵")
+            broadcast_country(key, f"💵 Global выдал {fmt_num(amount)} 💵!")
+            return
+        t = extract_user(text, reply_msg)
+        if not t: send(peer_id, "⚠ @user или казна"); return
+        amount = None
+        for a in args:
+            if a.isdigit() and int(a) > 0: amount = int(a); break
+        if not amount: send(peer_id, "⚠ Сумма"); return
+        nb = add_balance(peer_id, t, amount)
+        send(peer_id, f"✅ {mention(t, peer_id)}: +{fmt_num(amount)} 💵")
+        send_dm(t, f"💰 Global выдал {fmt_num(amount)} 💵!")
+        return
+    if kind == "оружие":
+        if len(args) >= 2 and args[1].lower() in ("казна","страна"):
+            if len(args) < 5: send(peer_id, "⚠ /выдать оружие казна <страна> <тип> <кол>"); return
+            key = args[2].lower(); weapon = args[3].lower()
+            if not args[4].isdigit(): send(peer_id, "⚠ Кол-во"); return
+            cnt = int(args[4])
+            if key not in COUNTRIES or weapon not in WEAPONS:
+                send(peer_id, "⚠ Страна/оружие не найдены."); return
+            c = get_country(key)
+            c.setdefault("weapons", {})[weapon] = c.get("weapons", {}).get(weapon, 0) + cnt
+            country_add_history(key, f"выдано {cnt} {weapon}")
+            save_cfg(cfg)
+            send(peer_id, f"✅ {country_name(key)}: +{cnt} {weapon}")
+            return
+        t = extract_user(text, reply_msg)
+        if not t: send(peer_id, "⚠ @user"); return
+        weapon = None
+        for a in args:
+            if a.lower() in WEAPONS: weapon = a.lower(); break
+        cnt = None
+        for a in args:
+            if a.isdigit() and int(a) > 0: cnt = int(a); break
+        if not weapon or not cnt: send(peer_id, "⚠ /выдать оружие @user <тип> <кол>"); return
+        send(peer_id, f"✅ {mention(t, peer_id)}: +{cnt} {weapon}")
+        send_dm(t, f"🔫 Global выдал {cnt} {weapon}!")
+        return
+    if kind == "военных":
+        if len(args) < 3 or not args[-1].isdigit():
+            send(peer_id, "⚠ /выдать военных <страна> <кол>"); return
+        key = args[1].lower()
+        if key not in COUNTRIES: send(peer_id, "⚠ Страна не найдена."); return
+        cnt = int(args[-1])
+        c = get_country(key)
+        c["army"] = c.get("army", 0) + cnt
+        country_add_history(key, f"выдано {cnt} войск")
+        save_cfg(cfg)
+        send(peer_id, f"✅ {country_name(key)}: +{fmt_num(cnt)} войск")
+        broadcast_country(key, f"🎖️ Global выдал {fmt_num(cnt)} войск!")
+        return
+    if kind == "вип":
+        t = extract_user(text, reply_msg)
+        if not t: send(peer_id, "⚠ @user"); return
+        c = get_chat(peer_id)
+        if c:
+            until = int(time.time()) + VIP_DURATION
+            c.setdefault("subs", {})[str(t)] = until; save_cfg(cfg)
+        send(peer_id, f"✅ {mention(t, peer_id)} — VIP на 30 дней!")
+        send_dm(t, "👑 Global выдал VIP на 30 дней!")
+        return
+    if kind == "ядерка":
+        if len(args) < 3 or not args[-1].isdigit():
+            send(peer_id, "⚠ /выдать ядерка <страна> <кол>"); return
+        key = args[1].lower()
+        if key not in COUNTRIES: send(peer_id, "⚠ Страна не найдена."); return
+        cnt = int(args[-1])
+        c = get_country(key)
+        c["nukes"] = c.get("nukes", 0) + cnt
+        country_add_history(key, f"выдано {cnt} ядерных бомб")
+        save_cfg(cfg)
+        send(peer_id, f"✅ {country_name(key)}: +{cnt} ядерных бомб ☢️")
+        broadcast_country(key, f"☢️ Global выдал {cnt} ядерных бомб!")
+        return
+    send(peer_id, "⚠ Типы: деньги, оружие, военных, вип, ядерка")
+
+# ================================================================
+# СТРАНЫ — ОСНОВНЫЕ КОМАНДЫ
 # ================================================================
 def cmd_countries(peer_id, uid):
     lines = ["🌍 <b>Страны мира:</b>", ""]
     for k, c in COUNTRIES.items():
         country = get_country(k) or {}
+        if country.get("destroyed"):
+            captor = country.get("captured_by")
+            captor_name = country_name(captor) if captor else "?"
+            lines.append(f"☠️ {c['name']} — <b>УНИЧТОЖЕНА</b>")
+            lines.append(f"   💀 Захвачена: {captor_name}")
+            host = country.get("hostages", [])
+            if host: lines.append(f"   🔒 Заложников: {len(host)}")
+            continue
         pres = country.get("president")
         army = country.get("army", 0)
         cities = country.get("cities_unlocked", 3)
@@ -679,6 +865,8 @@ def cmd_countries(peer_id, uid):
         lines.append(f"{c['name']}")
         lines.append(f"   👑 {pres_txt}")
         lines.append(f"   ⚔️ Армия: {fmt_num(army)} | 🏙 Городов: {cities}/20")
+        if country.get("nukes", 0) > 0:
+            lines.append(f"   ☢️ Ядерных бомб: {country['nukes']}")
     lines.append("")
     lines.append("📔 /паспорт | 🏛 /страна <название> | 🏛 /госскоманды")
     send(peer_id, "\n".join(lines))
@@ -689,34 +877,41 @@ def cmd_citizenship(peer_id, uid, args):
         if cit:
             cn = country_name(cit["country"])
             rank = RANKS.get(cit["rank"], {}).get("name", cit["rank"])
-            send(peer_id, f"🌍 Гражданин {cn}\n🎖️ Должность: {rank}\n\n📔 /паспорт\nСменить: /гражданство <страна>")
+            hostage = cit.get("hostage_until", 0) > time.time()
+            extra = "\n🔒 ВЫ В ЗАЛОЖНИКАХ!" if hostage else ""
+            send(peer_id, f"🌍 Гражданин {cn}\n🎖️ Должность: {rank}{extra}\n\n📔 /паспорт")
         else:
             lines = ["🌍 Доступные страны:"]
-            for k, c in COUNTRIES.items(): lines.append(f"• {k} — {c['name']}")
+            for k, c in COUNTRIES.items():
+                country = get_country(k)
+                mark = " ☠️" if country and country.get("destroyed") else ""
+                lines.append(f"• {k} — {c['name']}{mark}")
             lines.append("\nВступить: /гражданство <название>")
             send(peer_id, "\n".join(lines))
         return
     key = args[0].lower()
     if key not in COUNTRIES: send(peer_id, "❌ Страна не найдена. /страны"); return
+    c = get_country(key)
+    if c.get("destroyed"):
+        send(peer_id, "❌ Страна уничтожена — нельзя вступить."); return
     cit = get_citizenship(uid)
     if cit and cit["country"] == key:
         send(peer_id, "ℹ Вы уже гражданин."); return
     set_citizenship(uid, key)
-    cn = country_name(key)
-    send(peer_id, f"🎉 Вы стали гражданином {cn}!\n\n📔 /паспорт\n🏛 /страна {key}")
+    send(peer_id, f"🎉 Вы стали гражданином {country_name(key)}!\n\n📔 /паспорт\n🏛 /страна {key}")
     broadcast_country(key, f"👋 Новый гражданин: {mention(uid)}")
 
 def cmd_passport(peer_id, uid, args, reply_msg):
     target = extract_user(" ".join(args), reply_msg) or uid
     cit = get_citizenship(target)
     if not cit:
-        send(peer_id, "❌ Не гражданин. /гражданство" if target == uid else f"❌ {mention(target, peer_id)} не гражданин.")
-        return
+        send(peer_id, "❌ Не гражданин."); return
     c = get_country(cit["country"]) or {}
     cn = country_name(cit["country"])
     rank_name = RANKS.get(cit["rank"], {}).get("name", cit["rank"])
     bal = get_balance(peer_id, target)
     prefetch_names([target])
+    hostage = cit.get("hostage_until", 0) > time.time()
     lines = [
         "📔 ═══ ПАСПОРТ ═══",
         f"👤 {mention(target, peer_id)}",
@@ -724,6 +919,11 @@ def cmd_passport(peer_id, uid, args, reply_msg):
         f"🎖️ Должность: {rank_name}",
         f"💰 Баланс: {fmt_num(bal)}",
         f"📅 Вступил: {fmt_dt(cit['joined_at'])}",
+        f"💵 Вложено: {fmt_num(cit.get('donated', 0))}",
+    ]
+    if hostage:
+        lines.append(f"🔒 ЗАЛОЖНИК до {fmt_dt(cit['hostage_until'])}")
+    lines.extend([
         "",
         "🏛 О стране:",
         f"👑 Президент: {mention(c.get('president'), peer_id) if c.get('president') else '—'}",
@@ -731,58 +931,70 @@ def cmd_passport(peer_id, uid, args, reply_msg):
         f"👥 Граждан: {len(c.get('citizens', []))}",
         f"💰 Казна: {fmt_num(c.get('treasury', 0))}",
         f"⚔️ Армия: {fmt_num(c.get('army', 0))} (ур. {c.get('army_level', 1)})",
-    ]
+    ])
     send(peer_id, "\n".join(lines))
 
 def cmd_country_info(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not args and not cit:
-        send(peer_id, "⚠ /страна <название> или стань гражданином: /гражданство")
-        return
+        send(peer_id, "⚠ /страна <название>"); return
     key = (args[0].lower() if args else cit["country"])
     if key not in COUNTRIES: send(peer_id, "❌ Не найдена."); return
     c = get_country(key) or {}
+    if c.get("destroyed"):
+        captor = c.get("captured_by")
+        captor_name = country_name(captor) if captor else "?"
+        host = c.get("hostages", [])
+        lines = [
+            f"☠️ ═══ {country_name(key)} — УНИЧТОЖЕНА ═══",
+            "",
+            f"💀 Захвачена: {captor_name}",
+            f"🗓 Дата: {fmt_dt(c.get('destroyed_at', 0))}",
+            f"🔒 Заложников: {len(host)}",
+            "",
+            "📋 /граждане",
+        ]
+        send(peer_id, "\n".join(lines)); return
     lines = [
         f"🏛 ═══ {country_name(key)} ═══",
         f"👑 Президент: {mention(c.get('president'), peer_id) if c.get('president') else '—'}",
         f"🎖️ Главком: {mention(c.get('commander'), peer_id) if c.get('commander') else '—'}",
         f"👥 Граждан: {len(c.get('citizens', []))}",
         f"⚔️ Армия: {fmt_num(c.get('army', 0))} (ур. {c.get('army_level', 1)})",
-        f"🎯 Военная мощь: {fmt_num(country_army_power(key))}",
+        f"🎯 Мощь: {fmt_num(country_army_power(key))}",
         f"💰 Казна: {fmt_num(c.get('treasury', 0))}",
         f"🏙 Городов: {c.get('cities_unlocked', 3)}/20",
         f"💼 Налог: {c.get('tax', 5)}%",
         f"🤝 Коалиция: {c.get('coalition') or '—'}",
         f"⚔️ Войн: {len(c.get('wars', []))}",
+        f"☢️ Ядерных бомб: {c.get('nukes', 0)}",
         "",
         "📋 /граждане /города /казна /правительство /армия",
-        "🏛 /госскоманды — все команды",
     ]
     send(peer_id, "\n".join(lines))
 
 def cmd_citizens(peer_id, uid, args):
     if not args:
         cit = get_citizenship(uid)
-        if not cit: send(peer_id, "⚠ Укажите страну: /граждане <страна>"); return
+        if not cit: send(peer_id, "⚠ /граждане <страна>"); return
         key = cit["country"]
-    else:
-        key = args[0].lower()
+    else: key = args[0].lower()
     if key not in COUNTRIES: send(peer_id, "❌ Не найдена."); return
     c = get_country(key) or {}
     uids = c.get("citizens", [])
-    if not uids: send(peer_id, f"📭 В {country_name(key)} нет граждан."); return
+    if not uids: send(peer_id, f"📭 Нет граждан."); return
     prefetch_names(uids[:30])
     lines = [f"👥 Граждане {country_name(key)} ({len(uids)}):", ""]
     for u in uids[:30]:
         u_cit = get_citizenship(u) or {}
-        rank = RANKS.get(u_cit.get("rank","гражданин"), {}).get("name", "👤 Гражданин")
+        rank = RANKS.get(u_cit.get("rank","гражданин"), {}).get("name", "👤")
         lines.append(f"• {mention(u, peer_id)} — {rank}")
     if len(uids) > 30: lines.append(f"…и ещё {len(uids)-30}")
     send(peer_id, "\n".join(lines))
 
 def cmd_cities(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Стань гражданином: /гражданство <страна>"); return
+    if not cit: send(peer_id, "⚠ Стань гражданином."); return
     key = cit["country"]; c = get_country(key) or {}
     unlocked = c.get("cities_unlocked", 3)
     lines = [f"🏙 Города {country_name(key)} — {unlocked}/20", ""]
@@ -790,10 +1002,9 @@ def cmd_cities(peer_id, uid, args):
         if i <= unlocked:
             city_data = c.get("cities", {}).get(city, {})
             bcount = len(city_data.get("buildings", []))
-            lines.append(f"{i}. ✅ {city} — построек: {bcount}")
-        else:
-            lines.append(f"{i}. 🔒 {city} — закрыто")
-    lines.append(f"\n💰 Следующий город: /улучшитьстрану")
+            siren = " 🚨" if city_data.get("siren") else ""
+            lines.append(f"{i}. ✅ {city} — построек: {bcount}{siren}")
+        else: lines.append(f"{i}. 🔒 {city} — закрыто")
     send(peer_id, "\n".join(lines))
 
 def cmd_treasury(peer_id, uid, args):
@@ -804,16 +1015,17 @@ def cmd_treasury(peer_id, uid, args):
         h = c.get("history", [])[:10]
         if not h: send(peer_id, "📭 История пуста."); return
         lines = ["📜 История казны:"]
-        for item in h:
-            lines.append(f"• {fmt_dt(item['at'])} — {item['text']}")
+        for item in h: lines.append(f"• {fmt_dt(item['at'])} — {item['text']}")
         send(peer_id, "\n".join(lines)); return
     lines = [
         f"💰 Казна {country_name(key)}",
-        f"",
+        "",
         f"Баланс: {fmt_num(c.get('treasury', 0))} 💵",
         f"Налог: {c.get('tax', 5)}%",
         f"Граждан: {len(c.get('citizens', []))}",
-        f"История: /казна история",
+        "",
+        "💵 /донат <сумма> — пополнить",
+        "📜 /казна история",
     ]
     send(peer_id, "\n".join(lines))
 
@@ -834,11 +1046,8 @@ def cmd_government(peer_id, uid, args):
     send(peer_id, "\n".join(lines))
 
 def cmd_positions(peer_id, uid, args):
-    lines = ["🏛 Государственные должности:", ""]
-    for pos in GOV_POSITIONS:
-        lines.append(f"• {pos.title()}")
-    lines.append("\nНазначить: /назначить @user <должность> (президент)")
-    lines.append("Снять: /снятьминистра @user")
+    lines = ["🏛 Должности:", ""]
+    for pos in GOV_POSITIONS: lines.append(f"• {pos.title()}")
     send(peer_id, "\n".join(lines))
 
 def cmd_army(peer_id, uid, args):
@@ -846,23 +1055,20 @@ def cmd_army(peer_id, uid, args):
     if not cit: send(peer_id, "⚠ Стань гражданином."); return
     key = cit["country"]; c = get_country(key) or {}
     if args and args[0].lower() in ("выйти","leave"):
-        # увольнение
-        c["army"] = max(0, c.get("army", 0) - 1000)
-        save_cfg(cfg)
-        send(peer_id, "🎖️ Вы уволились из армии (-1000 войск)."); return
+        c["army"] = max(0, c.get("army", 0) - 1000); save_cfg(cfg)
+        send(peer_id, "🎖️ Уволились из армии (-1000)"); return
     weapons = c.get("weapons", {})
     w_str = "\n".join(f"   {WEAPONS[w]['emoji']} {w.title()}: {cnt}" for w, cnt in weapons.items() if cnt)
     lines = [
         f"⚔️ Армия {country_name(key)}",
-        f"",
+        "",
         f"👥 Войск: {fmt_num(c.get('army', 0))}",
         f"🎖️ Уровень: {c.get('army_level', 1)}/{ARMY_LEVEL_MAX}",
         f"🎯 Мощь: {fmt_num(country_army_power(key))}",
+        f"☢️ Ядерных бомб: {c.get('nukes', 0)}",
         "",
         "🔫 <b>Техника:</b>",
-        w_str if w_str else "   (нет техники)",
-        "",
-        f"📋 /мобилизация /сделать /пво /задание",
+        w_str if w_str else "   (нет)",
     ]
     send(peer_id, "\n".join(lines))
 
@@ -873,20 +1079,13 @@ def cmd_elections(peer_id, uid, args):
     el = c.get("elections", {})
     if not el.get("active"):
         pres = c.get("president")
-        send(peer_id,
-             f"🗳️ Выборы в {country_name(key)}\n\n"
-             f"👑 Президент: {mention(pres, peer_id) if pres else '—'}\n"
-             f"📊 Статус: неактивны\n\n"
-             f"🎯 /выдвинуться — стать кандидатом")
-        return
-    cands = el.get("candidates", [])
-    votes = el.get("votes", {})
-    lines = [f"🗳️ ВЫБОРЫ в {country_name(key)}", "",
-             f"⏰ До конца: {fmt_time(el.get('ends_at',0) - time.time()) if el.get('ends_at') else '—'}", ""]
+        send(peer_id, f"🗳️ Выборы неактивны\n👑 Президент: {mention(pres, peer_id) if pres else '—'}\n\n/выдвинуться"); return
+    cands = el.get("candidates", []); votes = el.get("votes", {})
+    lines = [f"🗳️ ВЫБОРЫ в {country_name(key)}", ""]
     for i, cand in enumerate(cands, 1):
         vc = sum(1 for v in votes.values() if v == cand)
-        lines.append(f"{i}. {mention(cand, peer_id)} — {vc} голосов")
-    lines.append(f"\n🗳️ /голос <номер> — проголосовать")
+        lines.append(f"{i}. {mention(cand, peer_id)} — {vc}")
+    lines.append(f"\n🗳️ /голос <номер>")
     send(peer_id, "\n".join(lines))
 
 def cmd_run_for_president(peer_id, uid, args):
@@ -894,19 +1093,14 @@ def cmd_run_for_president(peer_id, uid, args):
     if not cit: send(peer_id, "⚠ Только граждане."); return
     key = cit["country"]; c = get_country(key) or {}
     el = c.setdefault("elections", {"candidates": [], "votes": {}, "ends_at": 0, "active": False})
-    if el["active"]:
-        send(peer_id, "⚠ Выборы уже идут."); return
+    if el["active"]: send(peer_id, "⚠ Выборы идут."); return
     if uid in el["candidates"]: send(peer_id, "⚠ Вы уже кандидат."); return
     el["candidates"].append(uid)
-    # автозапуск если 2+ кандидата
     if len(el["candidates"]) >= 2 and not el["active"]:
-        el["active"] = True
-        el["ends_at"] = int(time.time()) + 3600  # 1 час
-        el["votes"] = {}
-        broadcast_country(key, f"🗳️ НАЧАЛИСЬ ВЫБОРЫ! Кандидаты: " +
-                          ", ".join(mention(x) for x in el["candidates"]))
+        el["active"] = True; el["ends_at"] = int(time.time()) + 3600; el["votes"] = {}
+        broadcast_country(key, "🗳️ НАЧАЛИСЬ ВЫБОРЫ!")
     save_cfg(cfg)
-    send(peer_id, f"✅ Вы выдвинулись в президенты {country_name(key)}!")
+    send(peer_id, f"✅ Выдвинулись в президенты!")
 
 def cmd_vote(peer_id, uid, args):
     cit = get_citizenship(uid)
@@ -914,31 +1108,25 @@ def cmd_vote(peer_id, uid, args):
     key = cit["country"]; c = get_country(key) or {}
     el = c.get("elections", {})
     if not el.get("active"): send(peer_id, "⚠ Выборы неактивны."); return
-    if uid in el.get("votes", {}): send(peer_id, "⚠ Вы уже голосовали."); return
-    if not args or not args[0].isdigit():
-        send(peer_id, "⚠ /голос <номер>"); return
-    idx = int(args[0]) - 1
-    cands = el.get("candidates", [])
+    if uid in el.get("votes", {}): send(peer_id, "⚠ Уже голосовали."); return
+    if not args or not args[0].isdigit(): send(peer_id, "⚠ /голос <номер>"); return
+    idx = int(args[0]) - 1; cands = el.get("candidates", [])
     if not 0 <= idx < len(cands): send(peer_id, "⚠ Неверный номер."); return
-    el["votes"][str(uid)] = cands[idx]
-    save_cfg(cfg)
+    el["votes"][str(uid)] = cands[idx]; save_cfg(cfg)
     send(peer_id, f"🗳️ Голос за {mention(cands[idx], peer_id)}!")
 
 def cmd_tax(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
     key = cit["country"]; c = get_country(key) or {}
-    # только президент
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
     if not args or not args[0].isdigit():
         send(peer_id, f"⚠ /налоги <1-20>. Сейчас: {c.get('tax', 5)}%"); return
     t = int(args[0])
     if not 1 <= t <= 20: send(peer_id, "⚠ 1-20"); return
-    c["tax"] = t
-    country_add_history(key, f"налог изменён на {t}%")
-    save_cfg(cfg)
-    send(peer_id, f"💰 Налог для ИП: {t}%")
+    c["tax"] = t; country_add_history(key, f"налог {t}%"); save_cfg(cfg)
+    send(peer_id, f"💰 Налог: {t}%")
 
 def cmd_appoint(peer_id, uid, args, reply_msg):
     cit = get_citizenship(uid)
@@ -948,28 +1136,21 @@ def cmd_appoint(peer_id, uid, args, reply_msg):
         send(peer_id, "⛔ Только президент."); return
     if not args: send(peer_id, "⚠ /назначить @user <должность>"); return
     t = extract_user(" ".join(args), reply_msg)
-    if not t: send(peer_id, "⚠ Укажите @user"); return
-    # найти должность в args
+    if not t: send(peer_id, "⚠ @user"); return
     pos = None
     for a in args:
         low = a.lower()
         for p in GOV_POSITIONS:
             if p in low or low in p: pos = p; break
         if pos: break
-    if not pos:
-        send(peer_id, f"⚠ Должность не найдена.\nДоступно: {', '.join(GOV_POSITIONS)}")
-        return
-    # проверить что цель — гражданин
+    if not pos: send(peer_id, f"⚠ Должность. Есть: {', '.join(GOV_POSITIONS)}"); return
     t_cit = get_citizenship(t)
-    if not t_cit or t_cit["country"] != key:
-        send(peer_id, "⚠ Пользователь не гражданин страны."); return
-    if c.get("president") == uid and pos == "президент":
-        send(peer_id, "⚠ Президент — только через выборы."); return
+    if not t_cit or t_cit["country"] != key: send(peer_id, "⚠ Не гражданин."); return
     c.setdefault("government", {})[pos] = t
-    country_add_history(key, f"{mention(t)} назначен на {pos}")
+    country_add_history(key, f"{mention(t)} на {pos}")
     save_cfg(cfg)
     send(peer_id, f"✅ {mention(t, peer_id)} — {pos.title()}")
-    send_dm(t, f"🏛 Вас назначили на должность «{pos.title()}» в {country_name(key)}!")
+    send_dm(t, f"🏛 Назначение на «{pos.title()}» в {country_name(key)}!")
 
 def cmd_remove_minister(peer_id, uid, args, reply_msg):
     cit = get_citizenship(uid)
@@ -978,29 +1159,28 @@ def cmd_remove_minister(peer_id, uid, args, reply_msg):
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
     t = extract_user(" ".join(args), reply_msg)
-    if not t: send(peer_id, "⚠ /снятьминистра @user"); return
+    if not t: send(peer_id, "⚠ @user"); return
     removed = []
     for pos, u in list(c.get("government", {}).items()):
         if u == t: del c["government"][pos]; removed.append(pos)
     save_cfg(cfg)
-    if removed: send(peer_id, f"❌ Снят с должностей: {', '.join(removed)}")
-    else: send(peer_id, "ℹ Не имел должностей.")
+    send(peer_id, f"❌ Снят с: {', '.join(removed)}" if removed else "ℹ Нет должностей.")
 
 def cmd_military_rank(peer_id, uid, args, reply_msg):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("commander") != uid and c.get("president") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Только главком или президент."); return
+        send(peer_id, "⛔ Нет прав."); return
     t = extract_user(" ".join(args), reply_msg)
-    if not t: send(peer_id, "⚠ /воинскоезвание @user <1-10>"); return
+    if not t: send(peer_id, "⚠ @user"); return
     rank_num = None
     for a in args:
         if a.isdigit() and 1 <= int(a) <= 10: rank_num = int(a); break
-    if not rank_num: send(peer_id, "⚠ Звание от 1 до 10."); return
+    if not rank_num: send(peer_id, "⚠ 1-10"); return
     c.setdefault("mil_ranks", {})[str(t)] = rank_num
     save_cfg(cfg)
-    send(peer_id, f"🎖️ {mention(t, peer_id)} — воинское звание {rank_num}")
+    send(peer_id, f"🎖️ {mention(t, peer_id)} — звание {rank_num}")
 
 def cmd_improve_country(peer_id, uid, args):
     cit = get_citizenship(uid)
@@ -1009,57 +1189,48 @@ def cmd_improve_country(peer_id, uid, args):
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
     unlocked = c.get("cities_unlocked", 3)
-    if unlocked >= 20: send(peer_id, "⚠ Все 20 городов уже открыты."); return
-    # стоимость растёт
+    if unlocked >= 20: send(peer_id, "⚠ Все 20 открыты."); return
     cost = 500000 * unlocked
     dev_points = len(c.get("government", {})) * 10 + c.get("army_level", 1) * 5
     if c.get("treasury", 0) < cost:
-        send(peer_id, f"❌ Нужно {fmt_num(cost)} 💵 и {dev_points} очков развития.")
-        return
+        send(peer_id, f"❌ Нужно {fmt_num(cost)} 💵"); return
     if dev_points < unlocked * 5:
-        send(peer_id, f"❌ Нужно минимум {unlocked*5} очков развития (у вас {dev_points}).")
-        return
+        send(peer_id, f"❌ Нужно минимум {unlocked*5} очков развития (у вас {dev_points})"); return
     c["treasury"] -= cost
     c["cities_unlocked"] = unlocked + 1
     new_city = CITIES[unlocked]
-    c.setdefault("cities", {})[new_city] = {"buildings": []}
-    country_add_history(key, f"открыт город {new_city}")
+    c.setdefault("cities", {})[new_city] = {"buildings": [], "pvo": 0, "siren": False}
+    country_add_history(key, f"открыт {new_city}")
     save_cfg(cfg)
-    broadcast_country(key, f"🏙 Открыт новый город: {new_city}!")
+    broadcast_country(key, f"🏙 Открыт город: {new_city}!")
 
 def cmd_buildings(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
     key = cit["country"]; c = get_country(key) or {}
     if not args:
-        send(peer_id, f"⚠ /постройки <город>\nДоступные города: " + ", ".join(CITIES[:c.get("cities_unlocked",3)]))
-        return
+        send(peer_id, "⚠ /постройки <город>"); return
     city = " ".join(args).title()
-    # найти город
     city_match = next((x for x in CITIES if x.lower() == city.lower()), None)
-    if not city_match:
-        send(peer_id, "❌ Город не найден."); return
+    if not city_match: send(peer_id, "❌ Город не найден."); return
     if CITIES.index(city_match) >= c.get("cities_unlocked", 3):
         send(peer_id, "❌ Город не открыт."); return
     b = c.get("cities", {}).get(city_match, {}).get("buildings", [])
-    if not b: send(peer_id, f"🏙 {city_match}: построек нет."); return
-    lines = [f"🏙 {city_match} — постройки:"]
+    if not b: send(peer_id, f"🏙 {city_match}: нет построек."); return
+    lines = [f"🏙 {city_match}:"]
     for x in b: lines.append(f"   {BUILDINGS.get(x, {}).get('emoji','🏢')} {x.title()}")
     send(peer_id, "\n".join(lines))
 
-def cmd_build(peer_id, uid, args):
+def cmd_build_obj(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
-    if len(args) < 2:
-        send(peer_id, "⚠ /построить <объект> <город>")
-        return
+    if len(args) < 2: send(peer_id, "⚠ /построить <объект> <город>"); return
     b_name = args[0].lower()
     if b_name not in BUILDINGS:
-        send(peer_id, f"⚠ Объект не найден. Доступно: {', '.join(BUILDINGS.keys())}")
-        return
+        send(peer_id, f"⚠ Объект. Есть: {', '.join(BUILDINGS.keys())}"); return
     city_name = " ".join(args[1:]).title()
     city_match = next((x for x in CITIES if x.lower() == city_name.lower()), None)
     if not city_match: send(peer_id, "❌ Город не найден."); return
@@ -1072,11 +1243,10 @@ def cmd_build(peer_id, uid, args):
     if b_name in b_list: send(peer_id, "⚠ Уже построено."); return
     c["treasury"] -= b_info["cost"]
     b_list.append(b_name)
-    # бонусы
     if b_name == "казарма": c["army"] = c.get("army", 0) + 5000
-    country_add_history(key, f"построен {b_name} в {city_match}")
+    country_add_history(key, f"{b_name} в {city_match}")
     save_cfg(cfg)
-    send(peer_id, f"✅ {b_info['emoji']} {b_name.title()} построен в {city_match}!\n➕ {b_info['bonus']}")
+    send(peer_id, f"✅ {b_info['emoji']} {b_name.title()} в {city_match}!\n➕ {b_info['bonus']}")
 
 def cmd_state_project(peer_id, uid, args):
     cit = get_citizenship(uid)
@@ -1089,11 +1259,11 @@ def cmd_state_project(peer_id, uid, args):
         return
     ptype, pname = args[0].lower(), " ".join(args[1:])
     if ptype not in ("наука","экономика","военный","культурный"):
-        send(peer_id, "⚠ Тип: наука / экономика / военный / культурный"); return
+        send(peer_id, "⚠ Тип неверный."); return
     c.setdefault("projects", []).append({"type": ptype, "name": pname, "at": int(time.time())})
     save_cfg(cfg)
-    send(peer_id, f"🏛 Запущен государственный проект: «{pname}» ({ptype})")
-    broadcast_country(key, f"🏛 Новый госпроект: «{pname}» ({ptype})")
+    send(peer_id, f"🏛 Запущен проект «{pname}» ({ptype})")
+    broadcast_country(key, f"🏛 Госпроект: «{pname}» ({ptype})")
 
 def cmd_armament(peer_id, uid, args):
     cit = get_citizenship(uid)
@@ -1101,15 +1271,12 @@ def cmd_armament(peer_id, uid, args):
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
-    if not args or not args[0].isdigit():
-        send(peer_id, "⚠ /вооружение <сумма>"); return
+    if not args or not args[0].isdigit(): send(peer_id, "⚠ /вооружение <сумма>"); return
     amount = int(args[0])
     if c.get("treasury", 0) < amount:
-        send(peer_id, f"❌ В казне только {fmt_num(c.get('treasury', 0))}"); return
-    # купить рандомную технику за сумму
+        send(peer_id, f"❌ Мало в казне."); return
     c["treasury"] -= amount
-    bought = []
-    remaining = amount
+    bought = []; remaining = amount
     for w_key, w_info in sorted(WEAPONS.items(), key=lambda x: -x[1]["cost"]):
         if remaining < w_info["cost"]: continue
         cnt = remaining // w_info["cost"]
@@ -1117,15 +1284,14 @@ def cmd_armament(peer_id, uid, args):
         bought.append(f"{w_info['emoji']} {w_key.title()} ×{cnt}")
         remaining -= cnt * w_info["cost"]
     save_cfg(cfg)
-    send(peer_id, "🛒 Закупка:\n" + ("\n".join(bought) if bought else "Ничего не куплено."))
+    send(peer_id, "🛒 Закупка:\n" + ("\n".join(bought) if bought else "Ничего."))
 
 # ================================================================
 # ВОЙНА
 # ================================================================
 def cmd_wars(peer_id, uid, args):
     wars = cfg.get("wars", [])
-    if not wars:
-        send(peer_id, "☮️ Активных войн нет."); return
+    if not wars: send(peer_id, "☮️ Активных войн нет."); return
     lines = ["⚔️ <b>Активные войны:</b>", ""]
     for i, w in enumerate(wars, 1):
         a = country_name(w["a"]); b = country_name(w["b"])
@@ -1137,30 +1303,28 @@ def cmd_wars(peer_id, uid, args):
 def cmd_declare_war(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
-    key = cit["country"]
-    c = get_country(key) or {}
+    key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
+    if c.get("destroyed"): send(peer_id, "❌ Страна уничтожена."); return
     if not args: send(peer_id, "⚠ /война <страна>"); return
     target = args[0].lower()
-    if target not in COUNTRIES: send(peer_id, "❌ Страна не найдена."); return
-    if target == key: send(peer_id, "⚠ Нельзя воевать с собой."); return
+    if target not in COUNTRIES: send(peer_id, "❌ Не найдена."); return
+    if target == key: send(peer_id, "⚠ Себя нельзя."); return
+    tc = get_country(target)
+    if tc.get("destroyed"): send(peer_id, "⚠ Уже уничтожена."); return
     if c.get("treasury", 0) < WAR_COST:
-        send(peer_id, f"❌ Для объявления войны нужно {fmt_num(WAR_COST)} в казне.\nСейчас: {fmt_num(c.get('treasury', 0))}"); return
-    # проверить нет ли уже войны
+        send(peer_id, f"❌ Нужно {fmt_num(WAR_COST)} 💵 в казне.\nСейчас: {fmt_num(c.get('treasury', 0))}"); return
     for w in cfg.get("wars", []):
         if (w["a"] == key and w["b"] == target) or (w["a"] == target and w["b"] == key):
             send(peer_id, "⚠ Война уже идёт."); return
     c["treasury"] -= WAR_COST
     c.setdefault("wars", []).append(target)
-    tc = get_country(target)
-    if tc: tc.setdefault("wars", []).append(key)
-    cfg.setdefault("wars", []).append({
-        "a": key, "b": target, "started_at": int(time.time()),
-        "attacker": key, "defender": target,
-    })
-    country_add_history(key, f"объявлена война {country_name(target)}")
-    if tc: country_add_history(target, f"{country_name(key)} объявила нам войну")
+    tc.setdefault("wars", []).append(key)
+    cfg.setdefault("wars", []).append({"a": key, "b": target, "started_at": int(time.time()),
+                                        "attacker": key, "defender": target})
+    country_add_history(key, f"война {country_name(target)}")
+    country_add_history(target, f"{country_name(key)} объявила войну")
     save_cfg(cfg)
     send(peer_id, f"⚔️ {country_name(key)} ОБЪЯВИЛА ВОЙНУ {country_name(target)}!")
     broadcast_country(key, f"⚔️ Мы объявили войну {country_name(target)}!")
@@ -1169,114 +1333,110 @@ def cmd_declare_war(peer_id, uid, args):
 def cmd_capture(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
-    key = cit["country"]
-    c = get_country(key) or {}
+    key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
     if not args: send(peer_id, "⚠ /захват <страна>"); return
     target = args[0].lower()
-    if target not in COUNTRIES: send(peer_id, "❌ Страна не найдена."); return
-    # должна быть активная война
+    if target not in COUNTRIES: send(peer_id, "❌ Не найдена."); return
     war = next((w for w in cfg.get("wars", []) if {w["a"], w["b"]} == {key, target}), None)
-    if not war: send(peer_id, "❌ Сначала объявите войну: /война <страна>"); return
-    send(peer_id, f"⏳ Кампания против {country_name(target)} началась! Продлится {WAR_CAPTURE_SECONDS//60} мин.")
-    broadcast_country(key, f"⚔️ Началась кампания против {country_name(target)}!")
-
+    if not war: send(peer_id, "❌ Сначала /война"); return
+    send(peer_id, f"⏳ Кампания против {country_name(target)} ({WAR_CAPTURE_SECONDS//60} мин)...")
+    broadcast_country(key, f"⚔️ Кампания против {country_name(target)}!")
     def resolve_capture():
         time.sleep(WAR_CAPTURE_SECONDS)
-        # урон по армиям
-        a_pow = country_army_power(key)
-        b_pow = country_army_power(target)
-        # атакующий немного сильнее
+        a_pow = country_army_power(key); b_pow = country_army_power(target)
         a_roll = random.uniform(0.7, 1.3) * a_pow
-        b_roll = random.uniform(0.7, 1.3) * b_pow * 1.1  # защита бонус
-        tc = get_country(target)
+        b_roll = random.uniform(0.7, 1.3) * b_pow * 1.1
+        tc = get_country(target); c_fresh = get_country(key)
+        if c_fresh.get("destroyed") or tc.get("destroyed"): return
         if a_roll > b_roll:
-            # атакующий побеждает
-            loss_b = int(tc.get("army", 0) * 0.3)
-            tc["army"] = max(0, tc.get("army", 0) - loss_b)
-            loss_a = int(c.get("army", 0) * 0.15)
-            c["army"] = max(0, c.get("army", 0) - loss_a)
-            loot = int(tc.get("treasury", 0) * 0.3)
-            tc["treasury"] -= loot
-            c["treasury"] = c.get("treasury", 0) + loot
-            country_add_history(key, f"победа в кампании против {country_name(target)}")
-            country_add_history(target, f"поражение от {country_name(key)}")
+            loot = tc.get("treasury", 0)
+            c_fresh["treasury"] = c_fresh.get("treasury", 0) + loot
+            tc["treasury"] = 0; tc["army"] = 0
+            tc["destroyed"] = True
+            tc["captured_by"] = key
+            tc["destroyed_at"] = int(time.time())
+            pres = tc.get("president")
+            if pres:
+                tc.setdefault("hostages", []).append(pres)
+                if get_citizenship(pres):
+                    cfg["citizens"][str(pres)]["hostage_until"] = int(time.time()) + 86400
+                send_dm(pres,
+                    f"🔒 ВЫ В ЗАЛОЖНИКАХ!\n\n"
+                    f"Страна {country_name(target)} уничтожена.\n"
+                    f"Захватчик: {country_name(key)}\n"
+                    f"Освобождение через 24ч.")
+            for w in list(cfg.get("wars", [])):
+                if {w["a"], w["b"]} == {key, target}: cfg["wars"].remove(w)
+            if target in c_fresh.get("wars", []): c_fresh["wars"].remove(target)
+            if key in tc.get("wars", []): tc["wars"].remove(key)
+            country_add_history(key, f"УНИЧТОЖЕНА {country_name(target)}")
+            country_add_history(target, f"УНИЧТОЖЕНА: {country_name(key)}")
             save_cfg(cfg)
-            broadcast_country(key, f"🏆 Победа! Захвачено {fmt_num(loot)} 💵 из {country_name(target)}")
-            broadcast_country(target, f"💀 Поражение! Потеряно {fmt_num(loot)} 💵 и {fmt_num(loss_b)} войск")
+            broadcast_country(key, f"🏆🏆🏆 ПОБЕДА! Уничтожена {country_name(target)}! +{fmt_num(loot)} 💵")
+            broadcast_country(target, f"☠️☠️☠️ СТРАНА УНИЧТОЖЕНА! Президент в заложниках 24ч.")
         else:
-            loss_a = int(c.get("army", 0) * 0.25)
-            c["army"] = max(0, c.get("army", 0) - loss_a)
+            loss_a = int(c_fresh.get("army", 0) * 0.25)
+            c_fresh["army"] = max(0, c_fresh.get("army", 0) - loss_a)
             loss_b = int(tc.get("army", 0) * 0.1)
             tc["army"] = max(0, tc.get("army", 0) - loss_b)
-            country_add_history(key, f"поражение в кампании против {country_name(target)}")
+            country_add_history(key, f"поражение от {country_name(target)}")
             save_cfg(cfg)
-            broadcast_country(key, f"💀 Кампания провалилась! Потеряно {fmt_num(loss_a)} войск")
-            broadcast_country(target, f"🛡️ Мы отбились от {country_name(key)}!")
-
+            broadcast_country(key, f"💀 Кампания провалилась. Потери: {fmt_num(loss_a)}")
+            broadcast_country(target, f"🛡️ Отбились от {country_name(key)}!")
     threading.Thread(target=resolve_capture, daemon=True).start()
 
 def cmd_counter_defense(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
-    key = cit["country"]
-    c = get_country(key) or {}
+    key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
-    if c.get("counter_used"):
-        send(peer_id, "⚠ Уже использовали контратаку."); return
+    if c.get("counter_used"): send(peer_id, "⚠ Уже использовали."); return
     war = next((w for w in cfg.get("wars", []) if key in (w["a"], w["b"])), None)
-    if not war: send(peer_id, "❌ Нет активной войны."); return
+    if not war: send(peer_id, "❌ Нет войны."); return
     enemy = war["b"] if war["a"] == key else war["a"]
     ec = get_country(enemy)
-    a_pow = country_army_power(key) * 1.5  # бонус обороны
+    if ec.get("destroyed"): send(peer_id, "⚠ Враг уже уничтожен."); return
+    a_pow = country_army_power(key) * 1.5
     b_pow = country_army_power(enemy)
     if a_pow > b_pow:
         loss = int(ec.get("army", 0) * 0.4)
         ec["army"] = max(0, ec.get("army", 0) - loss)
         loot = int(ec.get("treasury", 0) * 0.25)
-        ec["treasury"] -= loot
-        c["treasury"] = c.get("treasury", 0) + loot
-        c["counter_used"] = True
-        save_cfg(cfg)
-        broadcast_country(key, f"⚡ Успешная контратака! Захвачено {fmt_num(loot)} 💵, враг потерял {fmt_num(loss)} войск")
-        broadcast_country(enemy, f"💀 Контратака {country_name(key)}! Потери: {fmt_num(loss)} войск")
+        ec["treasury"] -= loot; c["treasury"] = c.get("treasury", 0) + loot
+        c["counter_used"] = True; save_cfg(cfg)
+        broadcast_country(key, f"⚡ Контратака успешна! +{fmt_num(loot)} 💵")
+        broadcast_country(enemy, f"💀 Контратака! Потери: {fmt_num(loss)}")
     else:
         c["counter_used"] = True
-        loss = int(c.get("army", 0) * 0.2)
-        c["army"] = max(0, c.get("army", 0) - loss)
+        loss = int(c.get("army", 0) * 0.2); c["army"] = max(0, c.get("army", 0) - loss)
         save_cfg(cfg)
-        broadcast_country(key, f"💀 Контратака провалилась. Потери: {fmt_num(loss)}")
+        broadcast_country(key, f"💀 Контратака провалилась. -{fmt_num(loss)}")
 
 def cmd_peace(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
-    key = cit["country"]
-    c = get_country(key) or {}
+    key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
     if not args: send(peer_id, "⚠ /мир <страна>"); return
     target = args[0].lower()
     war = next((w for w in cfg.get("wars", []) if {w["a"], w["b"]} == {key, target}), None)
     if not war: send(peer_id, "❌ Войны нет."); return
-    # требуем 500к от обеих сторон
     tc = get_country(target)
-    if c.get("treasury", 0) < 500000 or (tc and tc.get("treasury", 0) < 500000):
-        send(peer_id, f"❌ Для мира нужно по 500 000 💵 у обеих сторон."); return
-    c["treasury"] -= 500000
-    if tc: tc["treasury"] -= 500000
+    if c.get("treasury", 0) < 500000 or tc.get("treasury", 0) < 500000:
+        send(peer_id, "❌ Нужно по 500к у обеих."); return
+    c["treasury"] -= 500000; tc["treasury"] -= 500000
     cfg["wars"].remove(war)
-    c.setdefault("wars", [])
-    if target in c["wars"]: c["wars"].remove(target)
-    if tc:
-        tc.setdefault("wars", [])
-        if key in tc["wars"]: tc["wars"].remove(key)
-    country_add_history(key, f"мир с {country_name(target)}")
-    if tc: country_add_history(target, f"мир с {country_name(key)}")
+    if target in c.get("wars", []): c["wars"].remove(target)
+    if key in tc.get("wars", []): tc["wars"].remove(key)
+    country_add_history(key, f"мир {country_name(target)}")
+    country_add_history(target, f"мир {country_name(key)}")
     save_cfg(cfg)
-    broadcast_country(key, f"☮️ Заключён мир с {country_name(target)}")
-    if tc: broadcast_country(target, f"☮️ Заключён мир с {country_name(key)}")
+    broadcast_country(key, f"☮️ Мир с {country_name(target)}")
+    broadcast_country(target, f"☮️ Мир с {country_name(key)}")
 
 # ================================================================
 # КОАЛИЦИИ
@@ -1284,10 +1444,9 @@ def cmd_peace(peer_id, uid, args):
 def cmd_coalitions(peer_id, uid, args):
     coal = cfg.get("coalitions", {})
     if not coal: send(peer_id, "📭 Коалиций нет."); return
-    lines = ["🤝 <b>Военные коалиции:</b>", ""]
+    lines = ["🤝 <b>Коалиции:</b>", ""]
     for name, data in coal.items():
-        members = data.get("members", [])
-        leader = data.get("leader")
+        members = data.get("members", []); leader = data.get("leader")
         lines.append(f"🔹 <b>{name}</b> — {len(members)} стран")
         lines.append(f"   Лидер: {country_name(leader)}")
         for m in members:
@@ -1298,76 +1457,55 @@ def cmd_coalitions(peer_id, uid, args):
 def cmd_coalition(peer_id, uid, args, reply_msg):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
-    key = cit["country"]
-    c = get_country(key) or {}
+    key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
         send(peer_id, "⛔ Только президент."); return
     coal = cfg.setdefault("coalitions", {})
-
     if not args:
         my_name = c.get("coalition")
         if not my_name:
-            send(peer_id, "🤝 Вы не в коалиции.\n\n/коалиция <название> — создать\n/коалиции — список")
-            return
+            send(peer_id, "🤝 Не в коалиции.\n/коалиция <название>\n/коалиции"); return
         data = coal.get(my_name, {})
-        send(peer_id,
-             f"🤝 Коалиция «{my_name}»\n\n"
-             f"👑 Лидер: {country_name(data.get('leader'))}\n"
-             f"👥 Участники:\n" +
+        send(peer_id, f"🤝 «{my_name}»\n👑 {country_name(data.get('leader'))}\n" +
              "\n".join(f"   • {country_name(m)}" for m in data.get("members", [])))
         return
-
     sub = args[0].lower()
     if sub == "пригласить" and len(args) >= 2:
         my_name = c.get("coalition")
-        if not my_name: send(peer_id, "⚠ Вы не в коалиции."); return
+        if not my_name: send(peer_id, "⚠ Не в коалиции."); return
         data = coal.get(my_name, {})
         if data.get("leader") != key: send(peer_id, "⛔ Только лидер."); return
         target = args[1].lower()
         if target not in COUNTRIES: send(peer_id, "⚠ Страна не найдена."); return
         if target in data.get("members", []): send(peer_id, "⚠ Уже в коалиции."); return
-        data.setdefault("invites", []).append(target)
-        save_cfg(cfg)
+        data.setdefault("invites", []).append(target); save_cfg(cfg)
         send(peer_id, f"📨 Приглашение отправлено {country_name(target)}")
-        broadcast_country(target, f"🤝 {country_name(key)} приглашает в коалицию «{my_name}»\nПринять: /коалиция вступить {my_name}")
+        broadcast_country(target, f"🤝 {country_name(key)} приглашает в «{my_name}»\n/коалиция вступить {my_name}")
         return
     if sub == "вступить" and len(args) >= 2:
-        name = " ".join(args[1:])
-        data = coal.get(name)
-        if not data: send(peer_id, "⚠ Коалиция не найдена."); return
+        name = " ".join(args[1:]); data = coal.get(name)
+        if not data: send(peer_id, "⚠ Нет коалиции."); return
         if key not in data.get("invites", []): send(peer_id, "⚠ Нет приглашения."); return
-        data["invites"].remove(key)
-        data.setdefault("members", []).append(key)
-        c["coalition"] = name
-        save_cfg(cfg)
-        send(peer_id, f"✅ Вступили в коалицию «{name}»!")
-        return
+        data["invites"].remove(key); data.setdefault("members", []).append(key)
+        c["coalition"] = name; save_cfg(cfg)
+        send(peer_id, f"✅ Вступили в «{name}»!"); return
     if sub == "отклонить" and len(args) >= 2:
-        name = " ".join(args[1:])
-        data = coal.get(name)
-        if not data: send(peer_id, "⚠ Коалиция не найдена."); return
-        if key in data.get("invites", []): data["invites"].remove(key)
-        save_cfg(cfg)
-        send(peer_id, f"❌ Приглашение в «{name}» отклонено.")
-        return
+        name = " ".join(args[1:]); data = coal.get(name)
+        if data and key in data.get("invites", []): data["invites"].remove(key)
+        save_cfg(cfg); send(peer_id, f"❌ Отклонено."); return
     if sub == "покинуть":
         my_name = c.get("coalition")
-        if not my_name: send(peer_id, "⚠ Вы не в коалиции."); return
+        if not my_name: send(peer_id, "⚠ Не в коалиции."); return
         data = coal.get(my_name, {})
         if key in data.get("members", []): data["members"].remove(key)
         if data.get("leader") == key:
-            # передать первому
-            if data.get("members"):
-                data["leader"] = data["members"][0]
-            else:
-                del coal[my_name]
-        c["coalition"] = None
-        save_cfg(cfg)
-        send(peer_id, f"👋 Вы покинули коалицию.")
-        return
+            if data.get("members"): data["leader"] = data["members"][0]
+            else: del coal[my_name]
+        c["coalition"] = None; save_cfg(cfg)
+        send(peer_id, "👋 Покинули."); return
     if sub == "исключить" and len(args) >= 2:
         my_name = c.get("coalition")
-        if not my_name: send(peer_id, "⚠ Вы не в коалиции."); return
+        if not my_name: send(peer_id, "⚠ Не в коалиции."); return
         data = coal.get(my_name, {})
         if data.get("leader") != key: send(peer_id, "⛔ Только лидер."); return
         target = args[1].lower()
@@ -1375,261 +1513,226 @@ def cmd_coalition(peer_id, uid, args, reply_msg):
             data["members"].remove(target)
             tc = get_country(target)
             if tc: tc["coalition"] = None
-            save_cfg(cfg)
-            send(peer_id, f"❌ {country_name(target)} исключён.")
+            save_cfg(cfg); send(peer_id, f"❌ {country_name(target)} исключён.")
         return
     if sub == "передать" and len(args) >= 2:
         my_name = c.get("coalition")
-        if not my_name: send(peer_id, "⚠ Вы не в коалиции."); return
+        if not my_name: send(peer_id, "⚠"); return
         data = coal.get(my_name, {})
-        if data.get("leader") != key: send(peer_id, "⛔ Только лидер."); return
+        if data.get("leader") != key: send(peer_id, "⛔"); return
         target = args[1].lower()
-        if target not in data.get("members", []): send(peer_id, "⚠ Не в коалиции."); return
-        data["leader"] = target
-        save_cfg(cfg)
-        send(peer_id, f"👑 Лидерство передано {country_name(target)}")
-        return
+        if target not in data.get("members", []): send(peer_id, "⚠"); return
+        data["leader"] = target; save_cfg(cfg)
+        send(peer_id, f"👑 Передано {country_name(target)}"); return
     if sub == "распустить":
         my_name = c.get("coalition")
-        if not my_name: send(peer_id, "⚠ Вы не в коалиции."); return
+        if not my_name: send(peer_id, "⚠"); return
         data = coal.get(my_name, {})
-        if data.get("leader") != key: send(peer_id, "⛔ Только лидер."); return
+        if data.get("leader") != key: send(peer_id, "⛔"); return
         for m in data.get("members", []):
             mc = get_country(m)
             if mc: mc["coalition"] = None
-        del coal[my_name]
-        save_cfg(cfg)
-        send(peer_id, "💥 Коалиция распущена.")
-        return
-
-    # создать коалицию
+        del coal[my_name]; save_cfg(cfg)
+        send(peer_id, "💥 Распущена."); return
     name = " ".join(args)
-    if name in coal: send(peer_id, "⚠ Уже существует."); return
-    if c.get("coalition"): send(peer_id, "⚠ Вы уже в коалиции."); return
+    if name in coal: send(peer_id, "⚠ Существует."); return
+    if c.get("coalition"): send(peer_id, "⚠ Уже в коалиции."); return
     coal[name] = {"leader": key, "members": [key], "invites": []}
-    c["coalition"] = name
-    save_cfg(cfg)
-    send(peer_id, f"🤝 Коалиция «{name}» создана!")
+    c["coalition"] = name; save_cfg(cfg)
+    send(peer_id, f"🤝 «{name}» создана!")
 
 def cmd_coal_help_money(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
-    key = cit["country"]
-    c = get_country(key) or {}
+    if not cit: send(peer_id, "⚠"); return
+    key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Только президент."); return
-    if len(args) < 2 or not args[1].isdigit():
-        send(peer_id, "⚠ /коалпомощь <страна> <сумма>"); return
-    target = args[0].lower()
-    amount = int(args[1])
+        send(peer_id, "⛔"); return
+    if len(args) < 2 or not args[1].isdigit(): send(peer_id, "⚠ /коалпомощь <страна> <сумма>"); return
+    target = args[0].lower(); amount = int(args[1])
     tc = get_country(target)
-    if not tc: send(peer_id, "⚠ Страна не найдена."); return
-    # проверить что в одной коалиции
+    if not tc: send(peer_id, "⚠"); return
     if not c.get("coalition") or c.get("coalition") != tc.get("coalition"):
-        send(peer_id, "⚠ Только союзникам по коалиции."); return
-    if c.get("treasury", 0) < amount: send(peer_id, f"❌ В казне мало."); return
-    c["treasury"] -= amount
-    tc["treasury"] = tc.get("treasury", 0) + amount
+        send(peer_id, "⚠ Только союзникам."); return
+    if c.get("treasury", 0) < amount: send(peer_id, "❌"); return
+    c["treasury"] -= amount; tc["treasury"] = tc.get("treasury", 0) + amount
     save_cfg(cfg)
-    send(peer_id, f"💵 Передано {fmt_num(amount)} в {country_name(target)}")
+    send(peer_id, f"💵 Передано {fmt_num(amount)} → {country_name(target)}")
     broadcast_country(target, f"💵 Помощь от {country_name(key)}: +{fmt_num(amount)} 💵")
 
 def cmd_mil_help(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
-    key = cit["country"]
-    c = get_country(key) or {}
+    if not cit: send(peer_id, "⚠"); return
+    key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Только президент."); return
+        send(peer_id, "⛔"); return
     if len(args) < 3 or not args[2].isdigit():
-        send(peer_id, "⚠ /военпомощь <страна> <оружие> <количество>"); return
+        send(peer_id, "⚠ /военпомощь <страна> <оружие> <кол>"); return
     target = args[0].lower(); weapon = args[1].lower(); cnt = int(args[2])
     if weapon not in WEAPONS: send(peer_id, f"⚠ Оружие: {', '.join(WEAPONS.keys())}"); return
     tc = get_country(target)
-    if not tc: send(peer_id, "⚠ Нет страны."); return
+    if not tc: send(peer_id, "⚠"); return
     if c.get("coalition") != tc.get("coalition") or not c.get("coalition"):
         send(peer_id, "⚠ Только союзникам."); return
-    if c.get("weapons", {}).get(weapon, 0) < cnt:
-        send(peer_id, "❌ Недостаточно техники."); return
+    if c.get("weapons", {}).get(weapon, 0) < cnt: send(peer_id, "❌"); return
     c["weapons"][weapon] -= cnt
     tc.setdefault("weapons", {})[weapon] = tc.get("weapons", {}).get(weapon, 0) + cnt
     save_cfg(cfg)
-    send(peer_id, f"🚚 Передано {cnt} {weapon} в {country_name(target)}")
+    send(peer_id, f"🚚 {cnt} {weapon} → {country_name(target)}")
 
 def cmd_help_war(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Только президент."); return
+        send(peer_id, "⛔"); return
     if not args: send(peer_id, "⚠ /помочьвойна <страна>"); return
     ally = args[0].lower()
-    if ally not in COUNTRIES: send(peer_id, "⚠ Нет страны."); return
+    if ally not in COUNTRIES: send(peer_id, "⚠"); return
     ally_c = get_country(ally)
-    if not ally_c: send(peer_id, "⚠ Нет."); return
+    if not ally_c: send(peer_id, "⚠"); return
     if c.get("coalition") != ally_c.get("coalition") or not c.get("coalition"):
         send(peer_id, "⚠ Только союзникам."); return
-    # у союзника должна быть война
     ally_wars = ally_c.get("wars", [])
     if not ally_wars: send(peer_id, "⚠ У союзника нет войн."); return
     enemy = ally_wars[0]
-    cfg.setdefault("wars", []).append({
-        "a": key, "b": enemy, "started_at": int(time.time()),
-        "attacker": key, "defender": enemy, "helper": True,
-    })
+    cfg.setdefault("wars", []).append({"a": key, "b": enemy, "started_at": int(time.time()),
+                                        "attacker": key, "defender": enemy, "helper": True})
     c.setdefault("wars", []).append(enemy)
     ec = get_country(enemy)
     if ec: ec.setdefault("wars", []).append(key)
     save_cfg(cfg)
-    send(peer_id, f"⚔️ Мы вступили в войну против {country_name(enemy)} на стороне {country_name(ally)}")
+    send(peer_id, f"⚔️ Война против {country_name(enemy)} за {country_name(ally)}")
 
 # ================================================================
-# АРМИЯ И ПРОИЗВОДСТВО
+# АРМИЯ
 # ================================================================
 def cmd_mobilization(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Только президент или главком."); return
-    if c.get("mobilized"):
-        send(peer_id, "⚠ Уже мобилизованы."); return
+        send(peer_id, "⛔"); return
+    if c.get("mobilized"): send(peer_id, "⚠ Уже."); return
     bonus = int(c.get("army", BASE_ARMY) * 0.3)
     c["army"] = c.get("army", 0) + bonus
     c["mobilized"] = True
     c["mobilized_until"] = int(time.time()) + 12*3600
     save_cfg(cfg)
-    broadcast_country(key, f"📣 МОБИЛИЗАЦИЯ! +{fmt_num(bonus)} войск на 12 часов.")
+    broadcast_country(key, f"📣 МОБИЛИЗАЦИЯ! +{fmt_num(bonus)} войск на 12ч.")
 
 def cmd_demobilization(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Нет прав."); return
+        send(peer_id, "⛔"); return
     if not c.get("mobilized"): send(peer_id, "⚠ Не мобилизованы."); return
-    c["mobilized"] = False
-    c["mobilized_until"] = 0
+    c["mobilized"] = False; c["mobilized_until"] = 0
     save_cfg(cfg)
     broadcast_country(key, "📣 Демобилизация завершена.")
 
 def cmd_make_weapon(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Нет прав."); return
+        send(peer_id, "⛔"); return
     if len(args) < 2 or not args[1].isdigit():
-        send(peer_id, "⚠ /сделать <оружие> <количество>\nОружие: " + ", ".join(WEAPONS.keys()))
-        return
+        send(peer_id, "⚠ /сделать <оружие> <кол>\n" + ", ".join(WEAPONS.keys())); return
     weapon = args[0].lower(); cnt = int(args[1])
-    if weapon not in WEAPONS: send(peer_id, "⚠ Нет такого оружия."); return
+    if weapon not in WEAPONS: send(peer_id, "⚠"); return
     cost = WEAPONS[weapon]["cost"] * cnt
     if c.get("treasury", 0) < cost:
         send(peer_id, f"❌ Нужно {fmt_num(cost)} 💵"); return
     c["treasury"] -= cost
     c.setdefault("weapons", {})[weapon] = c.get("weapons", {}).get(weapon, 0) + cnt
     save_cfg(cfg)
-    send(peer_id, f"🏭 Произведено: {WEAPONS[weapon]['emoji']} {weapon.title()} ×{cnt}")
+    send(peer_id, f"🏭 {WEAPONS[weapon]['emoji']} {weapon.title()} ×{cnt}")
 
 def cmd_install_pvo(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Нет прав."); return
+        send(peer_id, "⛔"); return
     if len(args) < 2 or not args[-1].isdigit():
-        send(peer_id, "⚠ /установить пво <город> <количество>"); return
-    cnt = int(args[-1])
-    city = " ".join(args[:-1]).title()
+        send(peer_id, "⚠ /установить пво <город> <кол>"); return
+    cnt = int(args[-1]); city = " ".join(args[:-1]).title()
     city_match = next((x for x in CITIES if x.lower() == city.lower()), None)
     if not city_match: send(peer_id, "⚠ Город не найден."); return
     if CITIES.index(city_match) >= c.get("cities_unlocked", 3):
         send(peer_id, "⚠ Город не открыт."); return
     if c.get("weapons", {}).get("пво", 0) < cnt:
-        send(peer_id, "❌ Недостаточно ПВО (произведите /сделать пво)"); return
+        send(peer_id, "❌ Мало ПВО (произведите /сделать пво)"); return
     c["weapons"]["пво"] -= cnt
-    c.setdefault("cities", {}).setdefault(city_match, {}).setdefault("pvo", 0)
-    c["cities"][city_match]["pvo"] += cnt
+    c["cities"][city_match]["pvo"] = c["cities"].get(city_match, {}).get("pvo", 0) + cnt
     save_cfg(cfg)
-    send(peer_id, f"🚀 Установлено {cnt} ПВО в {city_match}")
+    send(peer_id, f"🚀 {cnt} ПВО в {city_match}")
 
 def cmd_pvo_info(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
-    lines = [f"🚀 ПВО {country_name(key)}", ""]
-    total = 0
+    lines = [f"🚀 ПВО {country_name(key)}", ""]; total = 0
     for city, data in c.get("cities", {}).items():
         pvo = data.get("pvo", 0)
-        if pvo:
-            lines.append(f"• {city}: {pvo} шт")
-            total += pvo
-    lines.append(f"\nСвободный склад: {c.get('weapons', {}).get('пво', 0)} шт")
-    lines.append(f"Всего ПВО: {total} шт")
-    lines.append(f"Шанс перехвата: {min(90, total//10)}%")
+        if pvo: lines.append(f"• {city}: {pvo}"); total += pvo
+    lines.append(f"\nСклад: {c.get('weapons', {}).get('пво', 0)}")
+    lines.append(f"Всего: {total}, перехват: {min(90, total//10)}%")
     send(peer_id, "\n".join(lines))
 
 def cmd_launch(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Нет прав."); return
-    if len(args) < 2: send(peer_id, "⚠ /запуск <оружие> <количество> [страна]"); return
+        send(peer_id, "⛔"); return
+    if len(args) < 2: send(peer_id, "⚠ /запуск <оружие> <кол> [страна]"); return
     weapon = args[0].lower()
-    if weapon not in ("ракета","бпла","ядерная"): 
+    if weapon not in ("ракета","бпла","ядерная"):
         send(peer_id, "⚠ Оружие: ракета / бпла / ядерная"); return
     if weapon == "ядерная":
-        # ядерный удар
-        if len(args) < 2: send(peer_id, "⚠ /запуск ядерная ракета <страна>"); return
+        if len(args) < 3 or not args[1] or args[1].lower() != "ракета":
+            if len(args) < 2: send(peer_id, "⚠ /запуск ядерная ракета <страна>"); return
         target = args[-1].lower()
         tc = get_country(target)
-        if not tc: send(peer_id, "⚠ Нет страны."); return
+        if not tc: send(peer_id, "⚠"); return
         war = next((w for w in cfg.get("wars", []) if {w["a"], w["b"]} == {key, target}), None)
         if not war: send(peer_id, "❌ Только против активной войны."); return
-        if c.get("weapons", {}).get("ракета", 0) < 5:
-            send(peer_id, "❌ Нужно 5 ракет для ядерного удара."); return
-        c["weapons"]["ракета"] -= 5
+        if c.get("nukes", 0) < 1:
+            send(peer_id, "❌ Нет ядерных бомб. Произведите или попросите Global."); return
+        c["nukes"] -= 1
         loss = int(tc.get("army", 0) * 0.5)
         tc["army"] = max(0, tc.get("army", 0) - loss)
         loot = int(tc.get("treasury", 0) * 0.4)
-        tc["treasury"] -= loot
-        c["treasury"] = c.get("treasury", 0) + loot
+        tc["treasury"] -= loot; c["treasury"] = c.get("treasury", 0) + loot
         country_add_history(key, f"ядерный удар по {country_name(target)}")
-        country_add_history(target, f"ядерный удар от {country_name(key)}")
+        country_add_history(target, f"ядерный удар {country_name(key)}")
         save_cfg(cfg)
         broadcast_country(key, f"☢️ ЯДЕРНЫЙ УДАР по {country_name(target)}!")
-        broadcast_country(target, f"☢️ ЯДЕРНЫЙ УДАР от {country_name(key)}! Потери: {fmt_num(loss)} войск, {fmt_num(loot)} 💵")
+        broadcast_country(target, f"☢️ ЯДЕРНЫЙ УДАР! Потери: {fmt_num(loss)}, {fmt_num(loot)} 💵")
         return
-    # обычный запуск
-    if len(args) < 2 or not args[1].isdigit():
-        send(peer_id, "⚠ /запуск <оружие> <количество> <страна>"); return
-    cnt = int(args[1])
-    if len(args) < 3: send(peer_id, "⚠ Укажите страну: /запуск ракета 3 сша"); return
-    target = args[2].lower()
+    if len(args) < 3 or not args[1].isdigit():
+        send(peer_id, "⚠ /запуск <оружие> <кол> <страна>"); return
+    cnt = int(args[1]); target = args[2].lower()
     tc = get_country(target)
-    if not tc: send(peer_id, "⚠ Нет страны."); return
+    if not tc: send(peer_id, "⚠"); return
     war = next((w for w in cfg.get("wars", []) if {w["a"], w["b"]} == {key, target}), None)
-    if not war: send(peer_id, "❌ Только против стороны активной войны."); return
+    if not war: send(peer_id, "❌ Только против активной войны."); return
     if c.get("weapons", {}).get(weapon, 0) < cnt:
-        send(peer_id, f"❌ Недостаточно {weapon}."); return
+        send(peer_id, f"❌ Мало {weapon}."); return
     c["weapons"][weapon] -= cnt
-    # перехват ПВО
     pvo_total = sum(d.get("pvo", 0) for d in tc.get("cities", {}).values())
-    intercepted = min(pvo_total, cnt * 2)  # ПВО перехватывает 2 ракеты за 1
+    intercepted = min(pvo_total, cnt * 2)
     hits = max(0, cnt - intercepted)
     power = WEAPONS.get(weapon, {}).get("power", 100) * hits
     loss = int(tc.get("army", 0) * (power / 50000))
     loss = min(loss, int(tc.get("army", 0) * 0.3))
     tc["army"] = max(0, tc.get("army", 0) - loss)
     save_cfg(cfg)
-    broadcast_country(key, f"🚀 Запущено {cnt} {weapon} по {country_name(target)}. Попаданий: {hits}, перехвачено: {intercepted}")
-    broadcast_country(target, f"🚨 Атака {country_name(key)}! Перехвачено: {intercepted}, попаданий: {hits}, потери: {fmt_num(loss)} войск")
+    broadcast_country(key, f"🚀 {cnt} {weapon} по {country_name(target)}. Попаданий: {hits}, перехвачено: {intercepted}")
+    broadcast_country(target, f"🚨 Атака! Перехвачено: {intercepted}, попаданий: {hits}, потери: {fmt_num(loss)}")
 
-# ================================================================
-# ЗАДАНИЯ (пополнение армии)
-# ================================================================
 def cmd_tasks(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
@@ -1637,106 +1740,115 @@ def cmd_tasks(peer_id, uid, args):
     cd = c.get("mil_task_cooldown", {}).get(str(uid), 0)
     now = time.time()
     if now < cd:
-        send(peer_id, f"⏳ Следующее задание через {fmt_time(cd-now)}"); return
+        send(peer_id, f"⏳ Через {fmt_time(cd-now)}"); return
     send(peer_id,
          f"📋 <b>Военное задание</b>\n\n"
-         f"Стоимость: {fmt_num(MIL_TASK_COST)} 💵 (из личного баланса)\n"
-         f"Награда: +{fmt_num(MIL_TASK_REWARD)} войск в казну страны\n"
+         f"Стоимость: {fmt_num(MIL_TASK_COST)} 💵\n"
+         f"Награда: +{fmt_num(MIL_TASK_REWARD)} войск\n"
          f"Кулдаун: 1 час\n\n"
-         f"Выполнить: /выполнитьзадание")
+         f"/выполнитьзадание")
 
 def cmd_do_task(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     cd = c.get("mil_task_cooldown", {}).get(str(uid), 0)
     now = time.time()
-    if now < cd:
-        send(peer_id, f"⏳ Подождите {fmt_time(cd-now)}"); return
+    if now < cd: send(peer_id, f"⏳ {fmt_time(cd-now)}"); return
     bal = get_balance(peer_id, uid)
     if bal < MIL_TASK_COST:
-        send(peer_id, f"❌ Нужно {fmt_num(MIL_TASK_COST)} 💵 (у вас {fmt_num(bal)})"); return
+        send(peer_id, f"❌ Нужно {fmt_num(MIL_TASK_COST)} (у вас {fmt_num(bal)})"); return
     add_balance(peer_id, uid, -MIL_TASK_COST)
     c["army"] = c.get("army", 0) + MIL_TASK_REWARD
     c.setdefault("mil_task_cooldown", {})[str(uid)] = int(now + MIL_TASK_COOLDOWN)
     save_cfg(cfg)
-    send(peer_id, f"✅ Задание выполнено!\n+{fmt_num(MIL_TASK_REWARD)} войск в армию {country_name(key)}")
-    broadcast_country(key, f"🎖️ {mention(uid)} выполнил военное задание: +{fmt_num(MIL_TASK_REWARD)} войск")
+    send(peer_id, f"✅ +{fmt_num(MIL_TASK_REWARD)} войск")
+    broadcast_country(key, f"🎖️ {mention(uid)}: +{fmt_num(MIL_TASK_REWARD)} войск")
 
-# ================================================================
-# УЛУЧШЕНИЕ АРМИИ
-# ================================================================
 def cmd_upgrade_army(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if c.get("president") != uid and c.get("commander") != uid and uid != int(cfg["global_owner"]):
-        send(peer_id, "⛔ Только президент или главком."); return
+        send(peer_id, "⛔"); return
     lvl = c.get("army_level", 1)
     if lvl >= ARMY_LEVEL_MAX: send(peer_id, "⚠ Максимум."); return
     cost = 500000 * lvl
-    if c.get("treasury", 0) < cost:
-        send(peer_id, f"❌ Нужно {fmt_num(cost)} 💵"); return
-    c["treasury"] -= cost
-    c["army_level"] = lvl + 1
+    if c.get("treasury", 0) < cost: send(peer_id, f"❌ Нужно {fmt_num(cost)}"); return
+    c["treasury"] -= cost; c["army_level"] = lvl + 1
     save_cfg(cfg)
     broadcast_country(key, f"🎖️ Армия улучшена до уровня {lvl+1}!")
 
 # ================================================================
-# КОМПАНИЯ (ООО)
+# КОМПАНИЯ / BUILD
 # ================================================================
 def cmd_company(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     comp = c.get("companies", {}).get(str(uid))
-    if not comp:
-        send(peer_id, "📭 У вас нет компании.\n/регистрация ООО <название>"); return
-    send(peer_id,
-         f"🏢 Компания: {comp.get('name')}\n"
-         f"🌍 Страна: {country_name(key)}\n"
-         f"💰 Налог: {c.get('tax', 5)}%\n"
-         f"📅 Создана: {fmt_dt(comp.get('at',0))}")
+    if not comp: send(peer_id, "📭 Нет компании.\n/регистрация ООО <название>"); return
+    send(peer_id, f"🏢 {comp.get('name')}\n🌍 {country_name(key)}\n💰 Налог: {c.get('tax', 5)}%")
 
 def cmd_register_company(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     if args and args[0].lower() in ("ооо","ooo"): args = args[1:]
     if not args: send(peer_id, "⚠ /регистрация ООО <название>"); return
-    name = " ".join(args)
-    cost = 100000
-    bal = get_balance(peer_id, uid)
-    if bal < cost: send(peer_id, f"❌ Нужно {fmt_num(cost)} 💵"); return
+    cost = 100000; bal = get_balance(peer_id, uid)
+    if bal < cost: send(peer_id, f"❌ Нужно {fmt_num(cost)}"); return
     add_balance(peer_id, uid, -cost)
-    c.setdefault("companies", {})[str(uid)] = {"name": name, "at": int(time.time())}
+    c.setdefault("companies", {})[str(uid)] = {"name": " ".join(args), "at": int(time.time())}
     save_cfg(cfg)
-    send(peer_id, f"🏢 Компания «{name}» зарегистрирована!")
+    send(peer_id, f"🏢 Компания зарегистрирована!")
 
 def cmd_rename_company(peer_id, uid, args):
     cit = get_citizenship(uid)
-    if not cit: send(peer_id, "⚠ Только граждане."); return
+    if not cit: send(peer_id, "⚠"); return
     key = cit["country"]; c = get_country(key) or {}
     comp = c.get("companies", {}).get(str(uid))
     if not comp: send(peer_id, "⚠ Нет компании."); return
     if not args: send(peer_id, "⚠ /переименоватьооо <название>"); return
-    comp["name"] = " ".join(args)
-    save_cfg(cfg)
-    send(peer_id, f"✅ Компания переименована в «{comp['name']}»")
+    comp["name"] = " ".join(args); save_cfg(cfg)
+    send(peer_id, f"✅ Переименовано в «{comp['name']}»")
 
-# ================================================================
-# ГЛОБАЛЬНЫЕ
-# ================================================================
+def cmd_build_link(peer_id, uid, args):
+    if not is_chat(peer_id): send(peer_id, "❌ Только в беседе."); return
+    c = get_chat(peer_id)
+    if uid != int(cfg["global_owner"]) and c.get("owner") != uid:
+        send(peer_id, "⛔ Только владелец беседы или Global."); return
+    if not args:
+        cur = c.get("build_name")
+        send(peer_id, f"🏗️ Текущая привязка: {cur or '—'}\n\n/build <название>"); return
+    name = " ".join(args).strip()
+    c["build_name"] = name
+    builds = cfg.setdefault("builds", {})
+    builds.setdefault(name, [])
+    if peer_id not in builds[name]: builds[name].append(peer_id)
+    save_cfg(cfg)
+    send(peer_id, f"🏗️ Беседа привязана к «{name}»\nВсего в сетке: {len(builds[name])}")
+
+def cmd_builds_list(peer_id, uid):
+    if uid != int(cfg["global_owner"]):
+        send(peer_id, "⛔ Только Global."); return
+    builds = cfg.get("builds", {})
+    if not builds: send(peer_id, "📭 Нет привязок."); return
+    lines = ["🏗️ Сетки бесед:"]
+    for name, peers in builds.items():
+        lines.append(f"\n📦 «{name}» — {len(peers)}")
+        for pid in peers[:5]: lines.append(f"  • {pid}")
+        if len(peers) > 5: lines.append(f"  … и ещё {len(peers)-5}")
+    send(peer_id, "\n".join(lines))
+
 def cmd_set_president_global(peer_id, uid, args, reply_msg):
     if uid != int(cfg["global_owner"]): send(peer_id, "⛔ Global."); return
     if not args: send(peer_id, "⚠ /устпрезидент @user <страна>"); return
     target = extract_user(" ".join(args), reply_msg)
     if not target: send(peer_id, "⚠ @user"); return
-    # найти страну в args
     key = None
     for a in args:
-        low = a.lower()
-        if low in COUNTRIES: key = low; break
+        if a.lower() in COUNTRIES: key = a.lower(); break
     if not key: send(peer_id, "⚠ Страна не найдена."); return
     if not get_citizenship(target): set_citizenship(target, key)
     cfg["citizens"][str(target)]["rank"] = "президент"
@@ -1744,7 +1856,7 @@ def cmd_set_president_global(peer_id, uid, args, reply_msg):
     old = c.get("president")
     if old and get_citizenship(old): cfg["citizens"][str(old)]["rank"] = "гражданин"
     c["president"] = target
-    country_add_history(key, f"{mention(target)} стал президентом")
+    country_add_history(key, f"{mention(target)} — президент")
     save_cfg(cfg)
     send(peer_id, f"👑 {mention(target, peer_id)} — президент {country_name(key)}!")
     broadcast_country(key, f"👑 Новый президент: {mention(target)}")
@@ -1756,16 +1868,12 @@ def cmd_set_citizenship_global(peer_id, uid, args, reply_msg):
     if not target: send(peer_id, "⚠ @user"); return
     key = None
     for a in args:
-        low = a.lower()
-        if low in COUNTRIES: key = low; break
+        if a.lower() in COUNTRIES: key = a.lower(); break
     if not key: send(peer_id, "⚠ Страна не найдена."); return
     set_citizenship(target, key)
     send(peer_id, f"✅ {mention(target, peer_id)} — гражданин {country_name(key)}")
-    send_dm(target, f"🌍 Вам выдано гражданство {country_name(key)}")
+    send_dm(target, f"🌍 Гражданство {country_name(key)} выдано")
 
-# ================================================================
-# ГЛОБАЛЬНЫЕ РОЛИ
-# ================================================================
 def cmd_gstaff(peer_id, uid):
     if uid != int(cfg["global_owner"]): send(peer_id, "⛔ Global."); return
     gs = cfg.get("global_staff", {})
@@ -1786,10 +1894,8 @@ def cmd_grole(peer_id, uid, args, reply_msg, text):
     ri = " ".join(role_args).strip()
     if not ri: send(peer_id, "⚠ /grole @user <роль>"); return
     rk = find_role_by_input(ri, peer_id)
-    if not rk:
-        send(peer_id, f"⚠ Роль «{ri}» не найдена."); return
-    cfg.setdefault("global_staff", {})[str(t)] = rk
-    save_cfg(cfg)
+    if not rk: send(peer_id, f"⚠ Роль «{ri}» не найдена."); return
+    cfg.setdefault("global_staff", {})[str(t)] = rk; save_cfg(cfg)
     rname = cfg["roles"].get(rk, {}).get("name", rk)
     send(peer_id, f"🌐 {mention(t, peer_id)} — {rname} (глобально).")
 
@@ -1797,23 +1903,22 @@ def cmd_removerole(peer_id, uid, args, reply_msg, text):
     if uid != int(cfg["global_owner"]): send(peer_id, "⛔ Global."); return
     t = extract_user(text, reply_msg)
     if not t: send(peer_id, "⚠ /removerole @user"); return
-    rem = cfg.get("global_staff", {}).pop(str(t), None)
-    save_cfg(cfg)
+    rem = cfg.get("global_staff", {}).pop(str(t), None); save_cfg(cfg)
     send(peer_id, "❌ Снято." if rem else "ℹ Нет роли.")
 
 # ================================================================
-# СПРАВКА
+# HELP
 # ================================================================
 def build_help():
     return f"""📋 Команды бота:
 
-🎮 ЭКОНОМИКА /баланс /топ /приз /подписка /buybiz /mybiz /collect
+🎮 ЭКОНОМИКА /баланс /топ /приз /подписка /buybiz /mybiz /collect /донат
 
 🎲 ИГРЫ /казино /дуэль /монетка /кубик /слоты /краш /дартс
 /колесо /рулетка /блэкджек /мины /башня /кейс /гонка /рыбалка
 
 🌍 ГОСУДАРСТВА
-🏛 /госскоманды — ВСЕ государственные команды
+🏛 /госскоманды — ВСЕ команды стран
 /страны /гражданство /паспорт /страна /граждане
 /города /казна /правительство /должности /армия
 /выборы /выдвинуться /голос
@@ -1824,6 +1929,7 @@ def build_help():
 /коалиции /коалиция /коалпомощь /военпомощь /помочьвойна
 /мобилизация /демобилизация /сделать /пво /установить /запуск
 /задание /выполнитьзадание
+🚨 /сирена <город> /воздухтревога
 
 🎟️ ПРОМОКОДЫ /promo /createpromo /promolist
 🎭 ИВЕНТЫ /ивент /ивент мафия
@@ -1833,15 +1939,17 @@ def build_help():
 /tickets /adt
 
 👑 ВЛАДЕЛЕЦ БЕСЕДЫ /setrole /removestaff /newrole /delrole
-/setwarns /setmutetime /setlog
+/setwarns /setmutetime /setlog /build
 
 🌐 GLOBAL /объявление /createivent
-/grole /removerole /gstaff
+/grole /removerole /gstaff /builds
 /устгражданство /устпрезидент
+💎 /выдать деньги|оружие|военных|вип|ядерка
 
 💰 Баланс: {START_BALANCE} | 🎁 /приз до {fmt_num(PRIZE_MAX)}
-⚔️ Война стоит: {fmt_num(WAR_COST)} 💵
+⚔️ Война: {fmt_num(WAR_COST)} 💵 из казны
 🎖️ Войск: {fmt_num(BASE_ARMY)} базово, пополнение через /задание
+💵 Пополнить казну: /донат
 ⭐ Бот требует права администратора в беседе
 """
 
@@ -1853,25 +1961,24 @@ GOS_CMDS_TEXT = """🏛 <b>КОМАНДЫ СТРАНЫ</b> 🏛
 /страны — список государств
 /гражданство [страна] — получить/сменить гражданство
 /паспорт [пользователь] — паспорт
-/страна — информация о стране
+/страна — информация
 /граждане — граждане страны
 /города — 20 городов
 /казна — казна + /казна история
-/правительство — состав
-/должности — список должностей
-/армия — вооружённые силы
-/армия выйти — уволиться
+/правительство /должности
+/армия /армия выйти
 /выборы /выдвинуться /голос
 /компания /регистрация ООО /переименоватьооо
+💵 /донат <сумма> — пополнить казну
 
 ━━━━━━━━━━━━━━━━━━━━━━
 ⚖️ <b>2/4 — Правительство и экономика</b>
 ━━━━━━━━━━━━━━━━━━━━━━
-/налоги [1-20] — налог для ИП
+/налоги [1-20]
 /назначить @user <должность>
 /снятьминистра @user
 /воинскоезвание @user [1-10]
-/улучшитьстрану — открыть город
+/улучшитьстрану
 /постройки <город>
 /построить <объект> <город>
 /госпроект <тип> <название>
@@ -1884,44 +1991,35 @@ GOS_CMDS_TEXT = """🏛 <b>КОМАНДЫ СТРАНЫ</b> 🏛
 ━━━━━━━━━━━━━━━━━━━━━━
 ⚔️ <b>3/4 — Армия и удары</b>
 ━━━━━━━━━━━━━━━━━━━━━━
-/мобилизация — +30% войск на 12ч
-/демобилизация
-/сделать <оружие> <количество>
-   Оружие: {weapons}
-/установить пво <город> <кол-во>
-/пво — состояние ПВО
+/мобилизация /демобилизация
+/сделать <оружие> <кол>
+   {weapons}
+/установить пво <город> <кол>
+/пво
 /запуск ракета <кол> <страна>
 /запуск бпла <кол> <страна>
 /запуск ядерная ракета <страна>
-📋 /задание → /выполнитьзадание — +{task} войск
-🎖️ /upgrade_army — улучшить армию (10 уровней)
-
-⚠️ Ракеты/БПЛА — только против активной войны.
+📋 /задание → /выполнитьзадание (+{task} войск)
+🎖️ /upgrade_army
+🚨 /сирена <город> /воздухтревога
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🤝 <b>4/4 — Коалиции и войны</b>
 ━━━━━━━━━━━━━━━━━━━━━━
-/коалиции — список
-/коалиция — своя
-/коалиция <название> — создать
-/коалиция пригласить <страна>
-/коалиция вступить <название>
-/коалиция отклонить <название>
-/коалиция покинуть
-/коалиция исключить <страна>
-/коалиция передать <страна>
-/коалиция распустить
+/коалиции /коалиция /коалиция <название>
+/коалиция пригласить|вступить|отклонить|покинуть
+/коалиция исключить|передать|распустить
 /коалпомощь <страна> <сумма>
 /военпомощь <страна> <оружие> <кол>
 /помочьвойна <страна>
-/войны — активные войны
-/война <страна> — объявить (стоит {war_cost} 💵)
-/захват <страна> — кампания 5 мин
-/контразащита — один раз
-/мир <страна> — мир за 500к с обеих сторон
+/войны
+/война <страна> — {war_cost} 💵
+/захват <страна> — кампания 5 мин → уничтожение
+/контразащита
+/мир <страна> — 500к с обеих сторон
 
-━━━━━━━━━━━━━━━━━━━━━━
-💡 События — всем гражданам страны.
+☠️ При уничтожении страна исчезает из списка,
+   президент — 24ч в заложниках.
 """
 
 def build_gos_cmds():
@@ -1932,6 +2030,15 @@ def build_gos_cmds():
     )
 
 # ================================================================
+# ЗАПУСК
+# ================================================================
+if __name__ == "__main__":
+    print(f"✅ VK Бот 9.0 запущен (PID={os.getpid()})")
+    print(f"   Группа: {GROUP_ID}")
+    print(f"   Война: {fmt_num(WAR_COST)}")
+    print(f"   Армия базово: {fmt_num(BASE_ARMY)}")
+    print("   Жду сообщений...\n")
+    # ================================================================
 # ИВЕНТЫ
 # ================================================================
 EVENTS_LIST = {
@@ -1991,7 +2098,7 @@ def ev_lottery(peer_id):
 
 def ev_halloween(peer_id):
     c = get_chat(peer_id); w = _pick(peer_id)
-    if not w: send(peer_id, "❌ Нет."); return
+    if not w: send(peer_id, "❌"); return
     c["muted"][str(w)] = {"until":time.time()+300,"last_dm":0}; save_cfg(cfg)
     send(peer_id, f"🎃 {mention(w,peer_id)} → 🔇 5 мин."); mute_notify_dm(w,5)
 
@@ -2001,12 +2108,12 @@ def ev_newyear(peer_id):
     w = _pick(peer_id)
     if w:
         c["nicknames"][str(w)] = "🎄 Снегурочка"; save_cfg(cfg)
-        send(peer_id, f"🎄 Снято мьютов: {un}\n{mention(w,peer_id)} → 🎄 Снегурочка")
+        send(peer_id, f"🎄 Снято: {un}\n{mention(w,peer_id)} → 🎄")
     else: save_cfg(cfg); send(peer_id, f"🎄 Снято: {un}")
 
 def ev_admin_abuse(peer_id):
     c = get_chat(peer_id); w = _pick(peer_id)
-    if not w: send(peer_id, "❌ Нет."); return
+    if not w: send(peer_id, "❌"); return
     c["nicknames"][str(w)] = ADMIN_ABUSE_TITLE
     stats = c.setdefault("user_stats",{}); key = str(w)
     s = stats.get(key) or {"msg_count":0,"last_text":"","last_at":0}
@@ -2015,28 +2122,28 @@ def ev_admin_abuse(peer_id):
 
 def ev_race(peer_id):
     c = get_chat(peer_id); w = _pick(peer_id)
-    if not w: send(peer_id, "❌ Нет."); return
+    if not w: send(peer_id, "❌"); return
     c["nicknames"][str(w)] = "🏎️ Гонщик"; save_cfg(cfg)
-    send(peer_id, f"🏎️ {mention(w,peer_id)} — 🏎️ Гонщик!")
+    send(peer_id, f"🏎️ {mention(w,peer_id)} — Гонщик!")
 
 def ev_gold(peer_id):
     w = _pick(peer_id)
-    if not w: send(peer_id, "❌ Нет."); return
+    if not w: send(peer_id, "❌"); return
     b = int(500 * full_vip_mult(peer_id, w)); nb = add_balance(peer_id, w, b)
     send(peer_id, f"💰 {mention(w,peer_id)} — +{fmt_num(b)}!\nБаланс: {fmt_num(nb)}")
 
 def ev_treasure(peer_id):
     w = _pick(peer_id)
-    if not w: send(peer_id, "❌ Нет."); return
+    if not w: send(peer_id, "❌"); return
     b = int(200 * full_vip_mult(peer_id, w)); nb = add_balance(peer_id, w, b)
     send(peer_id, f"🗝 {mention(w,peer_id)} — +{fmt_num(b)}!\nБаланс: {fmt_num(nb)}")
 
 def ev_blackout(peer_id):
     c = get_chat(peer_id); users = get_chat_members(peer_id)
-    if not users: send(peer_id, "❌ Нет."); return
+    if not users: send(peer_id, "❌"); return
     until = time.time() + 120
     for u in users: c["muted"][str(u)] = {"until":until,"last_dm":0}
-    save_cfg(cfg); send(peer_id, f"🌑 Блэкаут! {len(users)} в муте на 2 мин.")
+    save_cfg(cfg); send(peer_id, f"🌑 Блэкаут! {len(users)} в муте.")
 
 def ev_phoenix(peer_id):
     c = get_chat(peer_id); un = 0
@@ -2046,7 +2153,7 @@ def ev_phoenix(peer_id):
         winners = random.sample(users, min(3,len(users)))
         for w in winners: c["nicknames"][str(w)] = "🔥 Феникс"
         save_cfg(cfg)
-        send(peer_id, f"🔥 Снято: {un}\nТитул 🔥 Феникс: " + ", ".join(mention(w,peer_id) for w in winners))
+        send(peer_id, f"🔥 Снято: {un}\nТитул: " + ", ".join(mention(w,peer_id) for w in winners))
     else: save_cfg(cfg); send(peer_id, f"🔥 Снято: {un}")
 
 def ev_custom(peer_id, name):
@@ -2158,8 +2265,7 @@ def mafia_start_night(peer_id):
     if not g["alive"]: GAMES.pop(peer_id,None); return
     g["phase"] = "night"; g["round"] += 1
     g["night_step_idx"] = 0; g["night_step"] = None; g["night_actions"] = {}
-    g["waiter_block"] = None; g["votes"] = {}
-    g["lawyer_target"] = None
+    g["waiter_block"] = None; g["votes"] = {}; g["lawyer_target"] = None
     send(peer_id, f"🌃 Раунд {g['round']}. Город засыпает...")
     mafia_next_step(peer_id)
 
@@ -2228,7 +2334,8 @@ def mafia_night_dm(uid, text, peer_id):
               "doctor":(R_DOCTOR,),"lover":(R_LOVER,),"journalist":(R_JOURNALIST,),
               "lawyer":(R_LAWYER,),"beauty":(R_BEAUTY,),"maniac":(R_MANIAC,)}
     if role not in actors.get(step, ()): return False
-    if step in g["night_actions"] and step != "mafia": send_dm(uid, "Уже."); return True
+    if step in g["night_actions"] and step != "mafia":
+        send_dm(uid, "Уже."); return True
     if step == "journalist":
         pair = mafia_parse_num(text, g, 2)
         if not pair: send_dm(uid, "⚠️ Два номера: 2,5"); return True
@@ -2305,7 +2412,8 @@ def mafia_vote_dm(uid, text, peer_id):
     if not g or g["phase"] != "voting" or uid not in g["alive"]: return False
     if uid in g["votes"]: send_dm(uid, "Уже."); return True
     t = text.strip().lower()
-    if t in ("пропуск","skip","пас","0"): g["votes"][uid] = "skip"; send_dm(uid, "✅"); return True
+    if t in ("пропуск","skip","пас","0"):
+        g["votes"][uid] = "skip"; send_dm(uid, "✅"); return True
     target = mafia_parse_num(text, g, 1)
     if not target: send_dm(uid, "⚠️ Номер."); return True
     if target == uid: send_dm(uid, "⚠️ Себя нельзя."); return True
@@ -2362,6 +2470,28 @@ def mafia_ticker():
         except Exception as e: print(f"[ticker] {e}")
 
 threading.Thread(target=mafia_ticker, daemon=True).start()
+
+def hostage_ticker():
+    while True:
+        time.sleep(60)
+        try:
+            now = time.time(); changed = False
+            for c_key, country in cfg.get("countries", {}).items():
+                if not country.get("destroyed"): continue
+                new_hostages = []
+                for h in country.get("hostages", []):
+                    cit = get_citizenship(h)
+                    if cit and cit.get("hostage_until", 0) > now:
+                        new_hostages.append(h)
+                    else:
+                        if cit: cit["hostage_until"] = 0
+                        send_dm(h, "🔓 Вас освободили! Вы больше не заложник.")
+                        changed = True
+                country["hostages"] = new_hostages
+            if changed: save_cfg(cfg)
+        except Exception as e: print(f"[hostage_ticker] {e}")
+
+threading.Thread(target=hostage_ticker, daemon=True).start()
 
 # ================================================================
 # СТАТИСТИКА / ИНФО
@@ -2500,12 +2630,12 @@ def handle_welcome(peer_id, action):
 🌟 Рады видеть тебя, {u}!
 
 📋 <b>Что тут есть:</b>
-├ 🎮 /баланс — твои монеты
-├ 🏦 /buybiz — купить бизнес
-├ 🌍 /гражданство — стать гражданином страны
-├ 🏛 /госскоманды — государственные команды
+├ 🎮 /баланс — монеты
+├ 🏦 /buybiz — бизнес
+├ 🌍 /гражданство — стать гражданином
+├ 🏛 /госскоманды — все команды стран
 ├ 🎲 /казино /дуэль — игры
-├ 🎁 /приз — до 900 000 монет
+├ 🎁 /приз — до 900 000 💰
 ├ 🎭 /ивент — ивенты
 └ 📖 /help — все команды
 
@@ -2514,7 +2644,7 @@ def handle_welcome(peer_id, action):
     send(peer_id, greeting)
 
 # ================================================================
-# ИГРЫ (кратко)
+# ИГРЫ
 # ================================================================
 def _bet(args, bal):
     for i, a in enumerate(args):
@@ -2577,7 +2707,7 @@ def game_crash(peer_id, uid, args):
         win = int(b * (t-1) * full_vip_mult(peer_id, uid)); nb = add_balance(peer_id, uid, win)
         send(peer_id, f"🚀 {crash}x (цель {t}x)\n🎉 +{fmt_num(win)}\nБаланс: {fmt_num(nb)}")
     else:
-        nb = add_balance(peer_id, uid, -b); send(peer_id, f"🚀 {crash}x (цель {t}x)\n💀 -{fmt_num(b)}\nБаланс: {fmt_num(nb)}")
+        nb = add_balance(peer_id, uid, -b); send(peer_id, f"🚀 {crash}x (цель {t}x)\n💀 -{fmt_num(b)}")
 
 def game_darts(peer_id, uid, args):
     bal = get_balance(peer_id, uid); b, _ = _bet(args, bal)
@@ -2670,7 +2800,7 @@ def game_race(peer_id, uid, args):
     if b is None: send(peer_id, _); return
     if random.random() < 0.4:
         w = int(b * full_vip_mult(peer_id, uid)); nb = add_balance(peer_id, uid, w)
-        send(peer_id, f"🏎️ Первое место!\n🎉 +{fmt_num(w)}")
+        send(peer_id, f"🏎️ Первое!\n🎉 +{fmt_num(w)}")
     else:
         nb = add_balance(peer_id, uid, -b); send(peer_id, f"🏎️ Проиграли\n💀 -{fmt_num(b)}")
 
@@ -2814,9 +2944,6 @@ def cmd_promolist(peer_id, uid):
     for code, p in glob.items(): lines.append(f"🌐 {code} — {fmt_num(p['reward'])}")
     send(peer_id, "\n".join(lines))
 
-# ================================================================
-# ТОП / ВАЙП / БИЛДЫ / CMD
-# ================================================================
 def cmd_top(peer_id, args):
     if not is_chat(peer_id): send(peer_id, "❌ Только в беседе."); return
     c = get_chat(peer_id); mode = args[0].lower() if args else "баланс"
@@ -2849,24 +2976,6 @@ def cmd_wipe_all(peer_id, uid):
     for ch in cfg.get("chats",{}).values(): ch["balance"] = {}
     save_cfg(cfg); send(peer_id, "🧹 ГЛОБАЛЬНЫЙ ВАЙП!")
 
-def cmd_build(peer_id, uid, args):
-    if not is_chat(peer_id): send(peer_id, "❌ Только в беседе."); return
-    c = get_chat(peer_id)
-    if uid != int(cfg["global_owner"]) and c.get("owner") != uid: send(peer_id, "⛔"); return
-    if not args: send(peer_id, f"🏗️ {c.get('build_name') or '—'}"); return
-    name = " ".join(args); c["build_name"] = name
-    builds = cfg.setdefault("builds", {}); builds.setdefault(name, [])
-    if peer_id not in builds[name]: builds[name].append(peer_id)
-    save_cfg(cfg); send(peer_id, f"✅ {name} ({len(builds[name])})")
-
-def cmd_builds(peer_id, uid):
-    if uid != int(cfg["global_owner"]): send(peer_id, "⛔ Global."); return
-    builds = cfg.get("builds", {})
-    if not builds: send(peer_id, "📭 Нет."); return
-    lines = ["🏗️ Сетки:"]
-    for n, ps in builds.items(): lines.append(f"📦 {n} — {len(ps)}")
-    send(peer_id, "\n".join(lines))
-
 def cmd_cmd(peer_id, uid, args):
     c = get_chat(peer_id)
     if len(args) < 2:
@@ -2883,7 +2992,7 @@ def cmd_cmd(peer_id, uid, args):
     send(peer_id, f"✅ /{alias} = /{orig}")
 
 # ================================================================
-# ОСНОВНОЙ ЦИКЛ
+# MAIN
 # ================================================================
 def main():
     for event in longpoll.listen():
@@ -2973,7 +3082,6 @@ def main():
             aliases = get_chat(peer_id).get("custom_cmds", {})
             if cmd in aliases: cmd = aliases[cmd]
 
-        # неизвестная команда
         if cmd not in ALL_COMMANDS:
             send(peer_id,
                  f"❌ Команды «/{cmd}» не существует.\n\n"
@@ -2983,11 +3091,10 @@ def main():
                  reply_to=reply_ref)
             continue
 
-        # ===== HELP =====
         if cmd == "help": send(peer_id, build_help(), reply_to=reply_ref); continue
         if cmd == "госскоманды": send(peer_id, build_gos_cmds(), reply_to=reply_ref); continue
 
-        # ===== ГОСУДАРСТВО =====
+        # ГОСУДАРСТВО
         if cmd in ("страны","государства"): cmd_countries(peer_id, from_id); continue
         if cmd in ("гражданство","citizenship"): cmd_citizenship(peer_id, from_id, args); continue
         if cmd in ("паспорт","passport"): cmd_passport(peer_id, from_id, args, reply_msg); continue
@@ -3005,18 +3112,16 @@ def main():
         if cmd == "регистрация": cmd_register_company(peer_id, from_id, args); continue
         if cmd == "переименоватьооо": cmd_rename_company(peer_id, from_id, args); continue
 
-        # ===== ПРАВИТЕЛЬСТВО =====
         if cmd == "налоги": cmd_tax(peer_id, from_id, args); continue
         if cmd == "назначить": cmd_appoint(peer_id, from_id, args, reply_msg); continue
         if cmd == "снятьминистра": cmd_remove_minister(peer_id, from_id, args, reply_msg); continue
         if cmd == "воинскоезвание": cmd_military_rank(peer_id, from_id, args, reply_msg); continue
         if cmd == "улучшитьстрану": cmd_improve_country(peer_id, from_id, args); continue
         if cmd == "постройки": cmd_buildings(peer_id, from_id, args); continue
-        if cmd == "построить": cmd_build(peer_id, from_id, args); continue
+        if cmd == "построить": cmd_build_obj(peer_id, from_id, args); continue
         if cmd == "госпроект": cmd_state_project(peer_id, from_id, args); continue
         if cmd == "вооружение": cmd_armament(peer_id, from_id, args); continue
 
-        # ===== АРМИЯ =====
         if cmd == "мобилизация": cmd_mobilization(peer_id, from_id, args); continue
         if cmd == "демобилизация": cmd_demobilization(peer_id, from_id, args); continue
         if cmd == "сделать": cmd_make_weapon(peer_id, from_id, args); continue
@@ -3027,28 +3132,32 @@ def main():
         if cmd == "выполнитьзадание": cmd_do_task(peer_id, from_id, args); continue
         if cmd == "upgrade_army": cmd_upgrade_army(peer_id, from_id, args); continue
 
-        # ===== ВОЙНА =====
         if cmd == "войны": cmd_wars(peer_id, from_id, args); continue
         if cmd == "война": cmd_declare_war(peer_id, from_id, args); continue
         if cmd == "захват": cmd_capture(peer_id, from_id, args); continue
         if cmd == "контразащита": cmd_counter_defense(peer_id, from_id, args); continue
         if cmd == "мир": cmd_peace(peer_id, from_id, args); continue
 
-        # ===== КОАЛИЦИИ =====
         if cmd == "коалиции": cmd_coalitions(peer_id, from_id, args); continue
         if cmd == "коалиция": cmd_coalition(peer_id, from_id, args, reply_msg); continue
         if cmd == "коалпомощь": cmd_coal_help_money(peer_id, from_id, args); continue
         if cmd == "военпомощь": cmd_mil_help(peer_id, from_id, args); continue
         if cmd == "помочьвойна": cmd_help_war(peer_id, from_id, args); continue
 
-        # ===== ГЛОБАЛЬНЫЕ =====
         if cmd == "устпрезидент": cmd_set_president_global(peer_id, from_id, args, reply_msg); continue
         if cmd == "устгражданство": cmd_set_citizenship_global(peer_id, from_id, args, reply_msg); continue
         if cmd == "gstaff": cmd_gstaff(peer_id, from_id); continue
         if cmd == "grole": cmd_grole(peer_id, from_id, args, reply_msg, text); continue
         if cmd == "removerole": cmd_removerole(peer_id, from_id, args, reply_msg, text); continue
 
-        # ===== ПУБЛИЧНЫЕ =====
+        if cmd == "донат": cmd_donate(peer_id, from_id, args); continue
+        if cmd == "сирена": cmd_siren(peer_id, from_id, args); continue
+        if cmd in ("воздухтревога",): cmd_siren_all(peer_id, from_id, args); continue
+        if cmd == "выдать": cmd_give(peer_id, from_id, args, reply_msg, text); continue
+
+        if cmd == "build": cmd_build_link(peer_id, from_id, args); continue
+        if cmd == "builds": cmd_builds_list(peer_id, from_id); continue
+
         if cmd == "staff":
             if not is_chat(peer_id): send(peer_id, "❌ Только в беседе.", reply_to=reply_ref); continue
             send(peer_id, build_staff_text(peer_id), reply_to=reply_ref); continue
@@ -3113,10 +3222,6 @@ def main():
             if from_id != int(cfg["global_owner"]) and c.get("owner") != from_id and not can(from_id,"role",peer_id):
                 send(peer_id, "⛔", reply_to=reply_ref); continue
             cmd_promolist(peer_id, from_id); continue
-        if cmd == "build": cmd_build(peer_id, from_id, args); continue
-        if cmd == "builds":
-            if from_id != int(cfg["global_owner"]): send(peer_id, "⛔ Global.", reply_to=reply_ref); continue
-            cmd_builds(peer_id, from_id); continue
         if cmd == "вайп": cmd_wipe(peer_id, from_id); continue
         if cmd == "вайп_все": cmd_wipe_all(peer_id, from_id); continue
         if cmd == "cmd":
@@ -3155,9 +3260,8 @@ def main():
         if not can(from_id, cmd, peer_id):
             send(peer_id, "⛔ Нет прав.", reply_to=reply_ref); continue
 
-        # ===== МОДЕРАЦИЯ =====
         if cmd == "role":
-            if not is_chat(peer_id): send(peer_id, "❌ Только в беседе.", reply_to=reply_ref); continue
+            if not is_chat(peer_id): send(peer_id, "❌", reply_to=reply_ref); continue
             c = get_chat(peer_id)
             lines = ["🎭 Роли:"]
             all_roles = dict(cfg["roles"]); all_roles.update(c.get("local_roles", {}))
@@ -3176,7 +3280,7 @@ def main():
             send(peer_id, f"✅ {ok}", reply_to=reply_ref); continue
 
         if cmd == "newrole":
-            if not is_chat(peer_id): send(peer_id, "❌ Только в беседе.", reply_to=reply_ref); continue
+            if not is_chat(peer_id): send(peer_id, "❌", reply_to=reply_ref); continue
             if len(args) < 2 or not args[-1].isdigit():
                 send(peer_id, "⚠ /newrole <название> <0-100>", reply_to=reply_ref); continue
             pr = int(args[-1])
@@ -3222,7 +3326,7 @@ def main():
             if len(args) < 2 or not args[0].isdigit():
                 send(peer_id, "⚠ /adt <№> <ответ>", reply_to=reply_ref); continue
             ok, e = answer_ticket(args[0], from_id, " ".join(args[1:]))
-            send(peer_id, f"✅" if ok else f"❌ {e}", reply_to=reply_ref); continue
+            send(peer_id, "✅" if ok else f"❌ {e}", reply_to=reply_ref); continue
 
         if cmd == "loginfo":
             send(peer_id, f"📝 {cfg.get('log_peer_id') or 'нет'}", reply_to=reply_ref); continue
@@ -3231,7 +3335,7 @@ def main():
                 send(peer_id, "⛔", reply_to=reply_ref); continue
             if not is_chat(peer_id): send(peer_id, "❌", reply_to=reply_ref); continue
             cfg["log_peer_id"] = peer_id; save_cfg(cfg)
-            send(peer_id, f"✅", reply_to=reply_ref); continue
+            send(peer_id, "✅", reply_to=reply_ref); continue
         if cmd == "unsetlog":
             if from_id != int(cfg["global_owner"]): send(peer_id, "⛔", reply_to=reply_ref); continue
             cfg["log_peer_id"] = 0; save_cfg(cfg); send(peer_id, "✅", reply_to=reply_ref); continue
@@ -3246,7 +3350,7 @@ def main():
                 send(peer_id, "⛔", reply_to=reply_ref); continue
             if not args or not args[0].isdigit(): send(peer_id, "⚠ /setmutetime 30", reply_to=reply_ref); continue
             cfg["default_mute_minutes"] = int(args[0]); save_cfg(cfg)
-            send(peer_id, f"✅", reply_to=reply_ref); continue
+            send(peer_id, "✅", reply_to=reply_ref); continue
         if cmd == "banlist":
             if not is_chat(peer_id): send(peer_id, "❌", reply_to=reply_ref); continue
             b = get_chat(peer_id).get("banned", {})
@@ -3268,7 +3372,6 @@ def main():
             except Exception as e: send(peer_id, f"❌ {e}", reply_to=reply_ref)
             continue
 
-        # nick
         if cmd == "nick":
             m = re.search(r"\[id(\d+)\|", text)
             tid = int(m.group(1)) if m else (reply_msg.get("from_id") if reply_msg else None)
@@ -3287,7 +3390,6 @@ def main():
             c = get_chat(peer_id); rem = c["nicknames"].pop(str(tid), None); save_cfg(cfg)
             send(peer_id, "✅" if rem else "ℹ", reply_to=reply_ref); continue
 
-        # target
         target = extract_user(text, reply_msg)
         if not target: send(peer_id, "⚠ Укажи.", reply_to=reply_ref); continue
         if target == from_id: send(peer_id, "🤔 Себя нельзя.", reply_to=reply_ref); continue
@@ -3298,7 +3400,7 @@ def main():
         c = get_chat(peer_id); cid = chat_id_from_peer(peer_id)
 
         if cmd == "setowner":
-            if from_id != int(cfg["global_owner"]): send(peer_id, "⛔ Global.", reply_to=reply_ref); continue
+            if from_id != int(cfg["global_owner"]): send(peer_id, "⛔", reply_to=reply_ref); continue
             c["owner"] = target; save_cfg(cfg)
             send(peer_id, f"👑 {mention(target,peer_id)} — владелец.", reply_to=reply_ref); continue
         if cmd == "ban":
@@ -3319,13 +3421,13 @@ def main():
                 if ok: k += 1
             for ch in cfg.get("chats",{}).values():
                 ch["banned"][str(target)] = {"reason":reason,"by":from_id,"at":int(time.time()),"global":True}
-            save_cfg(cfg); send(peer_id, f"🌐 Глобан ({k})", reply_to=reply_ref)
+            save_cfg(cfg); send(peer_id, f"🌐 ({k})", reply_to=reply_ref)
         elif cmd == "ungban":
             rem = 0
             for ch in cfg.get("chats",{}).values():
                 i = ch["banned"].get(str(target))
                 if i and i.get("global"): del ch["banned"][str(target)]; rem += 1
-            save_cfg(cfg); send(peer_id, f"✅" if rem else "ℹ", reply_to=reply_ref)
+            save_cfg(cfg); send(peer_id, "✅" if rem else "ℹ", reply_to=reply_ref)
         elif cmd == "kick":
             ok, err = kick_user(cid, target)
             send(peer_id, "👢" if ok else f"❌ {err}", reply_to=reply_ref)
@@ -3376,9 +3478,9 @@ def main():
 
 # ================================================================
 if __name__ == "__main__":
-    print(f"✅ VK Бот 8.0 запущен (PID={os.getpid()})")
+    print(f"✅ VK Бот 9.0 запущен (PID={os.getpid()})")
     print(f"   Группа: {GROUP_ID}")
-    print(f"   Война стоит: {fmt_num(WAR_COST)}")
+    print(f"   Война: {fmt_num(WAR_COST)}")
     print(f"   Армия базово: {fmt_num(BASE_ARMY)}")
     print("   Жду сообщений...\n")
     try:
