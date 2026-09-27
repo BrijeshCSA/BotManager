@@ -3196,3 +3196,176 @@ def main():
 
 if __name__ == "__main__":
     main()
+# ============================================================
+# РАСШИРЕННЫЙ ТОП + УЧЁТ МАТОВ И ЗАХВАТОВ
+# Вставить ПЕРЕД `if __name__ == "__main__": main()`
+# ============================================================
+
+import re as _re_top
+
+# ---------- 1) Счётчик матов ----------
+_MAT_PATTERNS = [
+    "хуй", "хуя", "хую", "хуё", "хуе", "хуи", "хуйн", "хуепл", "хуес",
+    "пизд", "пизж",
+    "бляд", "блят", "блядь",
+    "муда", "муде", "муди", "мудо", "мудак", "мудил", "мудоз",
+    "манда", "манде", "манду", "мандо",
+    "сука", "суки", "суке", "суку", "сучк", "сучар", "сучон",
+    "шлюх", "шалав",
+    "пидор", "пидар", "пидр", "педик", "пидарас", "пидорас",
+    "гандон", "гондон", "гандо", "гондо",
+    "залуп", "дроч",
+    "жоп", "жёп",
+    "говн",
+    "уеб", "уёб", "уебан", "уёбан",
+    "долбоёб", "долбоеб", "долбаёб", "долбаеб",
+    "ебал", "ебан", "ебуч", "ебну", "ебат", "ебет", "ебёт", "ебут", "ебись", "ебля",
+    "ёбал", "ёбан", "ёбну", "ёбут", "ёби",
+]
+_MAT_REGEX = _re_top.compile("|".join(_MAT_PATTERNS), _re_top.IGNORECASE | _re_top.UNICODE)
+
+def _count_mats(text):
+    if not text: return 0
+    return len(_MAT_REGEX.findall(text))
+
+# Оборачиваем track_message — считаем маты на каждое сообщение
+_original_track_message = track_message
+
+def track_message(fid, peer_id, text):  # noqa: F811
+    _original_track_message(fid, peer_id, text)
+    if not text: return
+    cnt = _count_mats(text)
+    if cnt <= 0: return
+    c = get_chat(peer_id)
+    if not c: return
+    mats = c.setdefault("mat_count", {})
+    mats[str(fid)] = mats.get(str(fid), 0) + cnt
+    save_cfg(cfg)
+
+# ---------- 2) Счётчик захваченных стран ----------
+def cmd_capture(peer_id, uid, args):  # noqa: F811
+    cit = get_citizenship(uid)
+    if not cit: send(peer_id, "⚠"); return
+    key = cit["country"]; c = get_country(key) or {}
+    if c.get("president") != uid and uid != int(cfg["global_owner"]): send(peer_id, "⛔"); return
+    if not args: send(peer_id, "⚠ /захват <страна>"); return
+    target = args[0].lower()
+    if target not in COUNTRIES: send(peer_id, "❌"); return
+    war = next((w for w in cfg.get("wars", []) if {w["a"], w["b"]} == {key, target}), None)
+    if not war: send(peer_id, "❌ Сначала /война"); return
+    send(peer_id, f"⏳ Кампания {WAR_CAPTURE_SECONDS//60} мин...")
+    broadcast_country(key, f"⚔️ Кампания против {country_name(target)}!")
+
+    def resolve():
+        time.sleep(WAR_CAPTURE_SECONDS)
+        ap = country_army_power(key); bp = country_army_power(target)
+        ar = random.uniform(0.7, 1.3) * ap; br = random.uniform(0.7, 1.3) * bp * 1.1
+        tc = get_country(target); cf = get_country(key)
+        if cf.get("destroyed") or tc.get("destroyed"): return
+        if ar > br:
+            loot = tc.get("treasury", 0); cf["treasury"] = cf.get("treasury", 0) + loot
+            tc["treasury"] = 0; tc["army"] = 0; tc["destroyed"] = True
+            tc["captured_by"] = key; tc["destroyed_at"] = int(time.time())
+            pres = tc.get("president")
+            if pres:
+                tc.setdefault("hostages", []).append(pres)
+                if get_citizenship(pres): cfg["citizens"][str(pres)]["hostage_until"] = int(time.time()) + 86400
+                send_dm(pres, "🔒 ВЫ В ЗАЛОЖНИКАХ!")
+            for w in list(cfg.get("wars", [])):
+                if {w["a"], w["b"]} == {key, target}: cfg["wars"].remove(w)
+            if target in cf.get("wars", []): cf["wars"].remove(target)
+            if key in tc.get("wars", []): tc["wars"].remove(key)
+            cf["activation_points"] = cf.get("activation_points", 0) + 50
+            # ЗАСЧИТЫВАЕМ ЗАХВАТ ПРЕЗИДЕНТУ
+            if get_citizenship(uid):
+                cfg["citizens"][str(uid)]["captures"] = cfg["citizens"][str(uid)].get("captures", 0) + 1
+            save_cfg(cfg)
+            broadcast_country(key, f"🏆 ПОБЕДА! Уничтожена {country_name(target)}! +{fmt_num(loot)} 💵 +50 очков")
+            broadcast_country(target, f"☠️ СТРАНА УНИЧТОЖЕНА!")
+        else:
+            la = int(cf.get("army", 0) * 0.25); cf["army"] = max(0, cf.get("army", 0) - la)
+            lb = int(tc.get("army", 0) * 0.1); tc["army"] = max(0, tc.get("army", 0) - lb)
+            save_cfg(cfg)
+            broadcast_country(key, f"💀 Провал. -{fmt_num(la)}")
+            broadcast_country(target, f"🛡️ Отбились!")
+
+    threading.Thread(target=resolve, daemon=True).start()
+
+# Перепривязываем в диспетчере
+CMD_MAP["захват"] = cmd_capture
+
+# ---------- 3) Расширенный ТОП ----------
+def cmd_top_v2(peer_id, uid, args):
+    if not is_chat(peer_id): send(peer_id, "❌ Только в беседе."); return
+    c = get_chat(peer_id)
+    mode_raw = (args[0].lower() if args else "баланс")
+
+    if mode_raw in ("баланс", "balance", "деньги", "money"):
+        mode = "баланс"
+    elif mode_raw in ("вип", "vip", "подписка", "дни", "дней"):
+        mode = "вип"
+    elif mode_raw in ("сообщения", "сообщений", "msg", "смс", "messages"):
+        mode = "сообщения"
+    elif mode_raw in ("страны", "страна", "захват", "захваты", "захваченные", "captures"):
+        mode = "страны"
+    elif mode_raw in ("маты", "мат", "матюки", "ругань", "swear"):
+        mode = "маты"
+    else:
+        send(peer_id, "⚠ /топ [баланс|вип|сообщения|страны|маты]"); return
+
+    data = []
+    title = ""
+    val_fmt = str
+
+    if mode == "баланс":
+        data = [(k, v) for k, v in c.get("balance", {}).items() if v > 0]
+        title = "💰 ТОП по балансу"
+        val_fmt = lambda v: f"{fmt_num(v)} 💵"
+
+    elif mode == "вип":
+        now = time.time()
+        for k, until in c.get("subs", {}).items():
+            if until > now:
+                left_days = int((until - now) / 86400)
+                if left_days > 0: data.append((k, left_days))
+        title = "👑 ТОП по дням VIP (осталось)"
+        val_fmt = lambda v: f"{v} дн."
+
+    elif mode == "сообщения":
+        data = [(k, v.get("msg_count", 0)) for k, v in c.get("user_stats", {}).items() if v.get("msg_count", 0) > 0]
+        title = "📝 ТОП по сообщениям"
+        val_fmt = lambda v: f"{fmt_num(v)} сообщ."
+
+    elif mode == "страны":
+        members = set(c.get("user_stats", {}).keys()) | set(c.get("balance", {}).keys())
+        for uid_k in members:
+            cit = cfg.get("citizens", {}).get(uid_k)
+            if not cit: continue
+            cnt = cit.get("captures", 0)
+            if cnt > 0: data.append((uid_k, cnt))
+        title = "⚔️ ТОП по захваченным странам"
+        val_fmt = lambda v: f"{v} 🌍"
+
+    elif mode == "маты":
+        data = [(k, v) for k, v in c.get("mat_count", {}).items() if v > 0]
+        title = "🤬 ТОП по матам"
+        val_fmt = lambda v: f"{fmt_num(v)} шт."
+
+    if not data:
+        send(peer_id, f"📭 {title or 'Топ'} пуст."); return
+
+    data.sort(key=lambda x: -x[1])
+    prefetch_names([int(k) for k, _ in data[:10]])
+
+    lines = [title, ""]
+    medals = ["🥇", "🥈", "🥉"]
+    for i, (uid_k, v) in enumerate(data[:10]):
+        medal = medals[i] if i < 3 else f"{i+1}."
+        lines.append(f"{medal} {mention(int(uid_k), peer_id)} — {val_fmt(v)}")
+    send(peer_id, "\n".join(lines))
+
+# Регистрируем новую команду
+CMD_MAP["топ"] = cmd_top_v2
+CMD_MAP["top"] = cmd_top_v2
+
+print("✅ Расширенный /топ загружен")
