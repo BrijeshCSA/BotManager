@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, re, sys, json, time, random, threading
+import os, re, sys, json, time, random, threading, inspect, traceback
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.exceptions import VkApiError
@@ -420,7 +420,29 @@ def broadcast_country(k, text):
     c = get_country(k)
     if not c: return
     for uid in c.get("citizens", []): send_dm(uid, f"🏛 [{country_name(k)}] {text}")
-        # ========== ЭКОНОМИКА ==========
+
+# ========== УНИВЕРСАЛЬНЫЙ ВЫЗОВ ХЕНДЛЕРА ==========
+def call_handler(handler, peer_id, uid, args, reply_msg, text):
+    """Вызывает хендлер с правильным числом позиционных аргументов."""
+    try:
+        sig = inspect.signature(handler)
+        n = 0
+        for p in sig.parameters.values():
+            if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
+                n += 1
+            elif p.kind == inspect.Parameter.VAR_POSITIONAL:
+                n = 99
+                break
+    except (ValueError, TypeError):
+        n = 5
+
+    if n <= 0: return handler()
+    if n == 1: return handler(peer_id)
+    if n == 2: return handler(peer_id, uid)
+    if n == 3: return handler(peer_id, uid, args)
+    if n == 4: return handler(peer_id, uid, args, reply_msg)
+    return handler(peer_id, uid, args, reply_msg, text)
+    # ========== ЭКОНОМИКА ==========
 def cmd_donate(peer_id, uid, args):
     cit = get_citizenship(uid)
     if not cit: send(peer_id, "⚠ Только граждане."); return
@@ -2236,7 +2258,7 @@ def handle_welcome(peer_id, action):
     prefetch_names([inv])
     nick = c.get("nicknames",{}).get(str(inv))
     u = f"[id{inv}|{nick}]" if nick else f"[id{inv}|{get_vk_name(inv)}]"
-    send(peer_id, f"╔══════════════════════╗\n   👋 ДОБРО ПОЖАЛОВАТЬ!\n╚══════════════════════╝\n\n🌟 Рады видеть тебя, {u}!\n\n📋 Что тут:\n├ 🎮 /баланс\n├ 🌍 /гражданство\n├ 🏛 /госскоманды\n├ 🌉 /граница /склад /перевозка\n├ 🎭 /ивент\n└ 📖 /help /rules\n\n⚡ Приятной игры!")
+    send(peer_id, f"╔══════════════════════╗\n   👋 ДОБРО ПОЖАЛОВАТЬ!\n╚══════════════════════╝\n\n🌟 Рады видеть тебя, {u}!\n\n📋 Что тут:\n├ 🎮 /баланс\n├ 🌍 /гражданство\n├ 🏛 /госскоманды\n├ 🌉 /граница /склад /перевозка\n├ 🎭 /ивент /мафия\n└ 📖 /help /rules\n\n⚡ Приятной игры!")
 
 # ========== СПРАВКА ==========
 def build_help():
@@ -2527,7 +2549,8 @@ def cmd_quit(peer_id, uid):
     if not cid: return
     try:
         api.messages.removeChatUser(chat_id=cid, user_id=BOT_ID)
-    except Exception as e: send(peer_id, f"❌ {e}")
+    except Exception as e:
+        send(peer_id, f"❌ {e}")
 
 def cmd_rules(peer_id, uid):
     send(peer_id, """📜 ПРАВИЛА ЧАТА
@@ -2590,7 +2613,8 @@ def giveaway_ticker():
                     send(pid, "\n".join(lines))
                 cfg["giveaways"].pop(pid_str, None); ch = True
             if ch: save_cfg(cfg)
-        except Exception as e: print(f"[giveaway] {e}")
+        except Exception as e:
+            print(f"[giveaway] {e}")
 
 threading.Thread(target=giveaway_ticker, daemon=True).start()
 # ========== МОДЕРАЦИЯ ==========
@@ -3090,7 +3114,7 @@ def handle_message(msg):
     if not is_chat(peer_id):
         if from_id == BOT_ID: return
         if mafia_any_dm(from_id, text): return
-        if text.startswith("/") and text[1:].split()[0].lower() == "start":
+        if text.startswith("/") and text[1:].split() and text[1:].split()[0].lower() == "start":
             send_dm(from_id, "👋 Привет! Команды в чатах. /help в беседе.")
         return
 
@@ -3138,11 +3162,12 @@ def handle_message(msg):
         return
 
     try:
-        handler(peer_id, from_id, args, reply, text)
+        call_handler(handler, peer_id, from_id, args, reply, text)
         log_action(from_id, f"/{cmd}")
     except Exception as e:
+        traceback.print_exc()
         print(f"[cmd:{cmd}] {e}")
-        send(peer_id, f"❌ Ошибка: {e}")
+        send(peer_id, "❌ Ошибка выполнения команды. Администрация уведомлена.")
 
 # ========== LONGPOLL ==========
 def handle_event(event):
