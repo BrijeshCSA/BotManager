@@ -4932,3 +4932,88 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # ========== ПЕРЕЕЗД В ДРУГУЮ СТРАНУ ==========
+# Куда можно добраться по суше (автовокзал)
+LAND_COUNTRIES = {
+    "россия", "казахстан", "беларусь", "украина", "польша", "германия",
+    "франция", "италия", "испания", "турция", "китай", "индия",
+    "швеция", "швейцария", "египет", "оаэ",
+}
+# Через океан — только на самолёте
+OCEAN_COUNTRIES = {"сша", "канада", "бразилия", "мексика", "австралия", "корея", "япония", "великобритания"}
+
+FLY_TIME = 300   # 5 минут
+FLY_COST = 5000
+BUS_TIME = 120   # 2 минуты
+BUS_COST = 2000
+
+def cmd_fly(peer_id, uid, args):
+    """Полёт из аэропорта в другую страну."""
+    ensure_citizenship(uid)
+    if get_user_location(peer_id, uid) != "аэропорт":
+        send(peer_id, "✈️ Вы не в аэропорту!\nВызовите: /такси аэропорт"); return
+    if not args:
+        send(peer_id, "⚠ /полететь <страна>\nСписок стран: /страны"); return
+    target = args[0].lower()
+    if target not in COUNTRIES:
+        send(peer_id, "❌ Страна не найдена. Список: /страны"); return
+    cit = get_citizenship(uid)
+    if cit and cit["country"] == target:
+        send(peer_id, "🤔 Вы уже гражданин этой страны."); return
+    c = get_country(target)
+    if c.get("destroyed"):
+        send(peer_id, "❌ Страна уничтожена."); return
+    bal = get_balance(peer_id, uid)
+    if bal < FLY_COST:
+        send(peer_id, f"❌ Билет: {fmt_num(FLY_COST)} 💵. У вас: {fmt_num(bal)}."); return
+    add_balance(peer_id, uid, -FLY_COST)
+    send(peer_id, f"✈️ Полёт в {country_name(target)}...\n⏱ Время: {fmt_time(FLY_TIME)}\n💰 Оплачено: {fmt_num(FLY_COST)} 💵")
+    send_dm(uid, f"✈️ Самолёт вылетел в {country_name(target)}.\nПрибытие через {fmt_time(FLY_TIME)}.")
+
+    def arrive():
+        time.sleep(FLY_TIME)
+        set_citizenship(uid, target)
+        set_user_location(peer_id, uid, "аэропорт")
+        send(peer_id, f"✈️ {mention(uid, peer_id)} прибыл в {country_name(target)}!")
+        send_dm(uid, f"✅ Вы в {country_name(target)}!\n🌍 Гражданство изменено.\n📍 Локация: аэропорт")
+
+    threading.Thread(target=arrive, daemon=True).start()
+
+def cmd_go(peer_id, uid, args):
+    """Поездка на автобусе в другую страну (только по суше)."""
+    ensure_citizenship(uid)
+    if get_user_location(peer_id, uid) != "автовокзал":
+        send(peer_id, "🚌 Вы не на автовокзале!\nВызовите: /такси автовокзал"); return
+    if not args:
+        send(peer_id, "⚠ /поехать <страна>\nСписок стран: /страны"); return
+    target = args[0].lower()
+    if target not in COUNTRIES:
+        send(peer_id, "❌ Страна не найдена. Список: /страны"); return
+    if target not in LAND_COUNTRIES:
+        send(peer_id, f"🚫 В {country_name(target)} по суше не добраться.\n✈️ Летите через /полететь (из аэропорта)."); return
+    cit = get_citizenship(uid)
+    if cit and cit["country"] == target:
+        send(peer_id, "🤔 Вы уже гражданин этой страны."); return
+    c = get_country(target)
+    if c.get("destroyed"):
+        send(peer_id, "❌ Страна уничтожена."); return
+    bal = get_balance(peer_id, uid)
+    if bal < BUS_COST:
+        send(peer_id, f"❌ Билет: {fmt_num(BUS_COST)} 💵. У вас: {fmt_num(bal)}."); return
+    add_balance(peer_id, uid, -BUS_COST)
+    send(peer_id, f"🚌 Едем в {country_name(target)}...\n⏱ Время: {fmt_time(BUS_TIME)}\n💰 Оплачено: {fmt_num(BUS_COST)} 💵")
+    send_dm(uid, f"🚌 Автобус выехал в {country_name(target)}.\nПрибытие через {fmt_time(BUS_TIME)}.")
+
+    def arrive():
+        time.sleep(BUS_TIME)
+        set_citizenship(uid, target)
+        set_user_location(peer_id, uid, "автовокзал")
+        send(peer_id, f"🚌 {mention(uid, peer_id)} прибыл в {country_name(target)}!")
+        send_dm(uid, f"✅ Вы в {country_name(target)}!\n🌍 Гражданство изменено.\n📍 Локация: автовокзал")
+
+    threading.Thread(target=arrive, daemon=True).start()
+
+# Регистрация команд
+CMD_MAP["полететь"] = cmd_fly
+CMD_MAP["поехать"] = cmd_go
+CMD_MAP["переехать"] = cmd_go
