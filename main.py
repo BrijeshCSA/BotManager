@@ -5017,3 +5017,32 @@ def cmd_go(peer_id, uid, args):
 CMD_MAP["полететь"] = cmd_fly
 CMD_MAP["поехать"] = cmd_go
 CMD_MAP["переехать"] = cmd_go
+# ============================================================
+# ПАТЧ: ДЕЛАЕМ ПЕРЕЛЁТ И ПЕРЕЕЗД ДОСТУПНЫМИ ВСЕМ
+# ============================================================
+
+# Добавляем команды в список публичных (доступны любому игроку)
+for _cmd in ("полететь", "поехать", "переехать", "fly", "go", "taxi", "такси"):
+    if _cmd not in PUBLIC_CMDS:
+        PUBLIC_CMDS.append(_cmd)
+
+# Также обновляем все роли — теперь команды видны и админам
+for _role_key in ("helper", "moderator", "admin", "chief_admin",
+                  "chief_watcher", "deputy_chief_watcher",
+                  "deputy_chief_admin", "special_admin",
+                  "deputy_head", "head"):
+    _role = cfg.get("roles", {}).get(_role_key)
+    if _role and "полететь" not in _role.get("commands", []):
+        _role.setdefault("commands", []).extend(["полететь", "поехать", "переехать"])
+
+# Обновляем ALL_COMMANDS
+ALL_COMMANDS.update(["полететь", "поехать", "переехать", "fly", "go"])
+
+# Английские алиасы для удобства
+CMD_MAP["fly"] = cmd_fly
+CMD_MAP["go"] = cmd_go
+
+# Сохраняем конфиг с обновлёнными ролями
+save_cfg(cfg)
+
+print("✅ Команды /полететь, /поехать, /переехать доступны всем")
